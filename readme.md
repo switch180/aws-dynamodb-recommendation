@@ -80,3 +80,7 @@ Using the AWS CLI:
 This code is intended to be used as a starting point and may require additional modifications and error handling to fit your specific use case.
 
 It's important to keep in mind that this function is just a sample and you should always test and verify the function before use it in production.
+
+# License
+This software is provided "as is" and use it at your own risk.
+This code is licensed under the MIT License.
