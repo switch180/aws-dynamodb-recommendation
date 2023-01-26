@@ -1,6 +1,8 @@
 # README
 
-This is a AWS Lambda function that uses CloudWatch metrics to create cost estimates, DynamoDB throughput mode recommendations, and reserved cost recommendations for DynamoDB table(s).
+This function helps to analyze the usage of DynamoDB tables and provides recommendations for the throughput mode that can be used to optimize cost. It uses CloudWatch metrics to simulate the usage of DynamoDB tables and provides cost estimates for different throughput modes. This function can be a valuable tool for managing DynamoDB tables and ensuring that they are running in an optimal configuration.
+
+By using Athena and QuickSight, you can further analyze the data and gain insights into the usage patterns of your DynamoDB tables. This can help you to identify areas where you can optimize performance, reduce costs, and make better decisions about how to configure your DynamoDB tables.
 
 ## Parameters
 
@@ -35,8 +37,7 @@ The Lambda function performs the following steps:
 
 1. Fetches CloudWatch metrics data for the DynamoDB table
 2. Estimates the cost of the DynamoDB table based on the target read and write utilization and minimum capacity units
-3. Recommends the best provisioned mode for the DynamoDB table based on the cost estimate
-4. Recommends the best reserved capacity settings for the DynamoDB table based on the cost estimate
+3. Recommends the best throughput mode for the DynamoDB table based on the usage
 
 **Please note that the simulation of DynamoDB usage is based on the provided metrics and other assumptions, and it might be different from the actual usage.**
 # Deployment
@@ -75,6 +76,20 @@ Using the AWS CLI:
   aws lambda invoke --function-name my_lambda_function --payload '{"action":"create","accountid":"123456789","dynamodb_tablename":"my_table","dynamodb_read_utilization":"70","dynamodb_write_utilization":"70","dynamodb_minimum_units":"5","number_of_days_look_back":"30","cloudwatch_metric_end_datatime":"2022-01-01"}' response.json
   ```
 
+Use Athena to query the <ATHENA_TABLENAME>_recommendation view and see the recommended throughput mode:
+
+1.  Open the Amazon Athena console.
+2.  In the navigation pane, choose "Query Editor".
+3.  In the query editor, enter a query to select the recommended throughput mode from the ATHENA_TABLENAME, for example:
+
+  ```sh
+  SELECT recommended_throughput_mode FROM <ATHENA_TABLENAME>_recommendation;
+  ```
+
+4. Choose "Run Query"
+5. The query results will show the recommended throughput mode for the DynamoDB table.
+
+You can also connect the Athena Table to QuickSight and do further analysis.
 ## Note
 
 This code is intended to be used as a starting point and may require additional modifications and error handling to fit your specific use case.
