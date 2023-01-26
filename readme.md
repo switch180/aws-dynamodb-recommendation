@@ -73,7 +73,7 @@ To invoke this Lambda function, you can use the AWS Lambda service in the AWS Ma
 Using the AWS CLI:
 
   ```sh
-  aws lambda invoke --function-name my_lambda_function --payload '{"action":"create","accountid":"123456789","dynamodb_tablename":"my_table","dynamodb_read_utilization":"70","dynamodb_write_utilization":"70","dynamodb_minimum_units":"5","number_of_days_look_back":"30","cloudwatch_metric_end_datatime":"2022-01-01"}' response.json
+  aws lambda invoke --function-name my_lambda_function --payload '{"action":"create","accountid":"123456789","dynamodb_tablename":"all","dynamodb_read_utilization":70,"dynamodb_write_utilization":70,"dynamodb_minimum_units":5,"number_of_days_look_back":12,"cloudwatch_metric_end_datatime":"2023-01-26 00:00:00"}' response.json
   ```
 
 Use Athena to query the <ATHENA_TABLENAME>_recommendation view and see the recommended throughput mode:
