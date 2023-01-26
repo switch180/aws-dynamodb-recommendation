@@ -2,8 +2,8 @@ Resources:
   S3Bucket:
     Type: 'AWS::S3::Bucket'
     Properties:
-      BucketName: !Ref AWS::StackName
-  DynamoDB_Cost_Estimate_Role:
+      BucketName: !Ref 'AWS::StackName'
+  DynamoDBCostEstimateRole:
     Type: 'AWS::IAM::Role'
     Properties:
       AssumeRolePolicyDocument:
@@ -36,16 +36,17 @@ Resources:
           - Action:
             - 's3:*'
             Resource:
-            - !GetAtt S3Bucket.Arn
+            - !GetAtt
+              - S3Bucket
+              - Arn
             - !Sub
-              - 'arn:${AWS::Partition}:s3:::${OutputBucket}/*'
+              - 'arn:${AWS::Partition}:s3:::${S3Bucket}/*'
               - bucketName: !Ref S3Bucket
             Effect: Allow
       Tags:
       - Value: SAM
         Key: 'lambda:createdBy'
-
-  DynamoDB_Cost_Estimate_Function:
+  DynamoDBCostEstimateFunction:
     Type: 'AWS::Lambda::Function'
     Properties:
       Handler: lambda_function.lambda_handler
@@ -57,7 +58,7 @@ Resources:
       MemorySize: 4096
       Timeout: 900
       Role: !GetAtt
-      - AthenaConfigRole
+      - 'DynamoDBCostEstimateRole'
       - Arn
       Environment:
         Variables:
@@ -71,8 +72,6 @@ Resources:
         - - 'arn:aws:lambda'
           - !Ref 'AWS::Region'
           - '336392948345:layer:AWSSDKPandas-Python38:3'
-    DependsOn:
-    - Python
 Parameters:
   S3Prefix:
     Default: dynamodb_estimate
@@ -82,12 +81,8 @@ Parameters:
     Default: default
     Type: String
     Description: Athena Database name
-  FunctionName:
-    Default: !Ref AWS::StackName
-    Description: Lambda Function Name for Creating Athena Table
-    Type: String
   AthenaTableName:
-    Default: default
+    Default: dynamodb
     Type: String
     Description: Athena Table Name to create for accessing  Metrics and Estimates
   LambdaFunctionS3Key:

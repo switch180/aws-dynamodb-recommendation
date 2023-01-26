@@ -4,11 +4,9 @@ import athena
 
 def create_reserved_cost(params):
     tablename = params['athena_tablename']
-    region = params['region']
     database = params['athena_database']
     bucket = params['athena_bucket']
     path = params['athena_bucket_prefix']
-    mins = params['dynamodb_minimum_units']
 
     intialqu = """CREATE OR REPLACE VIEW %s_resrvation_recommendation AS 
         SELECT
@@ -76,7 +74,6 @@ def create_reserved_cost(params):
         )  c ON ("p"."provisionedmetric_name" = "c"."metric_name"))"""
     resrvqu = intialqu % (tablename, tablename, tablename)
     params = {
-        'region': region,
         'database': database,
         'bucket': bucket,
         'path': path,
@@ -92,7 +89,6 @@ def create_reserved_cost(params):
 
 def create_cost_estimate(params):
     tablename = params['athena_tablename']
-    region = params['region']
     database = params['athena_database']
     bucket = params['athena_bucket']
     path = params['athena_bucket_prefix']
@@ -376,7 +372,6 @@ def create_cost_estimate(params):
         tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename,
         tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename)
     params = {
-        'region': region,
         'database': database,
         'bucket': bucket,
         'path': path,
@@ -391,7 +386,6 @@ def create_cost_estimate(params):
 
 def create_dynamo_mode_recommendation(params):
     tablename = params['athena_tablename']
-    region = params['region']
     database = params['athena_database']
     bucket = params['athena_bucket']
     path = params['athena_bucket_prefix']
@@ -431,7 +425,6 @@ def create_dynamo_mode_recommendation(params):
             ))"""
     costmodequ = intialqu % (tablename, tablename)
     params = {
-        'region': region,
         'database': database,
         'bucket': bucket,
         'path': path,

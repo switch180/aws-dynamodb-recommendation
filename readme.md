@@ -1,44 +1,47 @@
 # README
 
-This code is a Lambda function that fetches CloudWatch Metrics for DynamoDB tables, estimates units, and generates cost and reservation recommendations.
+This is a AWS Lambda function that uses CloudWatch metrics to create cost estimates, DynamoDB throughput mode recommendations, and reserved cost recommendations for DynamoDB table(s).
+
+## Parameters
+
+The function takes the following parameters in the event:
+
+- `action`: The action to perform. Accepted values are create or insert. create will recreate everything and insert will append the new metrics to existing metrics.
+- `accountid`: The AWS account ID of the DynamoDB table.
+- `dynamodb_tablename`: The name of the DynamoDB table to create cost estimates and recommendations for.
+- `dynamodb_read_utilization`: The read utilization percentage threshold to use when creating recommendations.
+- `dynamodb_write_utilization`: The write utilization percentage threshold to use when creating recommendations.
+- `dynamodb_minimum_units`: The minimum number of read and write capacity units to use when creating recommendations.
+- `number_of_days_look_back`: The number of days to look back in CloudWatch metrics when creating cost estimates and recommendations. Maximum number of days is 14 due to CloudWatch metrics limitations
+- `cloudwatch_metric_end_datatime`: The end time of the CloudWatch metrics to use when creating cost estimates and recommendations.
+
+It also takes the following environment variables:
+
+- `ATHENA_TABLENAME`: The name of the Athena table to create cost estimates and recommendations in.
+- `ATHENA_DATABASE`: The name of the Athena database to create cost estimates and recommendations in.
+- `ATHENA_BUCKET`: The name of the S3 bucket to use for Athena results.
+- `ATHENA_PREFIX`: The prefix of the S3 bucket to use for Athena results.
 
 ## Dependencies
 
 This function requires the following libraries to be installed:
 
 - boto3
-- os
-- pandas
 - awswrangler
 
 ## Functionality
 
-The main function `lambda_handler` takes in two parameters: `ddbname` and `accountid`.
+The Lambda function performs the following steps:
 
-- `ddbname` is the name of the DynamoDB table for which the metrics are to be fetched.
+1. Fetches CloudWatch metrics data for the DynamoDB table
+2. Estimates the cost of the DynamoDB table based on the target read and write utilization and minimum capacity units
+3. Recommends the best provisioned mode for the DynamoDB table based on the cost estimate
+4. Recommends the best reserved capacity settings for the DynamoDB table based on the cost estimate
 
-  - If the `ddbname` parameter is set to 'all', the function will retrieve metrics for all DynamoDB tables in the specified AWS account.
-  - If the `ddbname` parameter is set to a specific table name, the function will retrieve metrics only for that table.
-
-- `accountid` is the AWS account ID for which the metrics are to be fetched.
-
-The function first initializes the parameters, including the action, the account ID, and the DynamoDB table name. It then calls the `get_metrics` function, which is responsible for fetching the CloudWatch metrics for the DynamoDB table. The function also has the provision to estimate the units, estimate the cost and create recommendations table in Athena.
-
-If any exception occurs while executing the code, the error message is printed and returned as the response.
-
-## Usage
-
-To use this function, you will need to create a Lambda function in your AWS account, and then upload this code as the function code. You will also need to provide the necessary environment variables and IAM role for the function to access the necessary services.
-
-You can invoke this function using an event source, such as an API Gateway or SNS topic.
-
-You can also test the function by invoking it with the required parameters and testing the output.
-
+**Please note that the simulation of DynamoDB usage is based on the provided metrics and other assumptions, and it might be different from the actual usage.**
 # Deployment
 
 You can deploy this function as a zip file by CloudFormation template that creates the necessary resources such as the Lambda function, IAM role, and environment variables.
-
-## Zipping the function folder
 
 To deploy your function using CloudFormation, you will need to package the source code in a zip file.
 
@@ -46,7 +49,8 @@ To deploy your function using CloudFormation, you will need to package the sourc
 2. Run the following command to create a zip file of the `src` folder:
 
   ```sh
-  zip -r function.zip src/
+  cd src
+  zip -r function.zip .
   ```
 
 3. Upload the `function.zip` file to an S3 bucket. Make sure to update the CloudFormation template to reference this S3 object.
@@ -58,7 +62,17 @@ To deploy your function using CloudFormation, you will need to package the sourc
 4. Deploy the CloudFormation template and pass the bucket name and function s3 key as parameters
 
   ```sh
-  aws cloudformation deploy --template-file deployment.yaml --stack-name <your-stack-name> --parameter-overrides LambdaFunctionS3Bucket=<your-bucket-name>, LambdaFunctionS3Key=function.zip
+  aws cloudformation deploy --template-file deployment.yaml --stack-name dynamodb-estimation --parameter-overrides LambdaFunctionS3Bucket=<your-bucket-name> LambdaFunctionS3Key=<function.zip> --capabilities CAPABILITY_IAM
+  ```
+
+## Usage
+
+To invoke this Lambda function, you can use the AWS Lambda service in the AWS Management Console, the AWS Command Line Interface (CLI), or one of the AWS SDKs. Here are examples of how you can invoke the function using the AWS CLI :
+
+Using the AWS CLI:
+
+  ```sh
+  aws lambda invoke --function-name my_lambda_function --payload '{"action":"create","accountid":"123456789","dynamodb_tablename":"my_table","dynamodb_read_utilization":"70","dynamodb_write_utilization":"70","dynamodb_minimum_units":"5","number_of_days_look_back":"30","cloudwatch_metric_end_datatime":"2022-01-01"}' response.json
   ```
 
 ## Note
