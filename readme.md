@@ -83,7 +83,7 @@ Use Athena to query the <ATHENA_TABLENAME>_recommendation view and see the recom
 3.  In the query editor, enter a query to select the recommended throughput mode from the ATHENA_TABLENAME, for example:
 
   ```sh
-  SELECT recommended_throughput_mode FROM <ATHENA_TABLENAME>_recommendation;
+  SELECT * FROM <ATHENA_TABLENAME>_recommendation;
   ```
 
 4. Choose "Run Query"
