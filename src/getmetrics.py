@@ -204,13 +204,15 @@ def get_metrics(params):
     endtime = endtime.strftime('%Y-%m-%dT%H:%M:%SZ')
     starttime = starttime.strftime('%Y-%m-%dT%H:%M:%SZ')
 
+
+    if athena_database not in wr.catalog.databases().values:
+            wr.catalog.create_database(athena_database)
+
     def write_to_s3(df, location, mode, table):
         wr.s3.to_parquet(df=df, path=location, database=athena_database, dataset=True, mode=mode, table=table)
 
     def create_athena_table(tablename):
-        wr.catalog.table(database='default', table=tablename)
-
-   
+        wr.catalog.table(database=athena_database, table=tablename)
 
     metrics = lstmetrics(dynamodb_tablename)
     result = get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid, readutilization, writeutilization)

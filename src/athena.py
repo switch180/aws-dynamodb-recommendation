@@ -1,8 +1,12 @@
 import boto3
 import time
+import os
+
+
+client = boto3.client('athena')
 
 def query_results(session, params):
-    client = boto3.client('athena')
+    
     response_query_execution_id = client.start_query_execution(
         QueryString = params['query'],
         QueryExecutionContext = {
