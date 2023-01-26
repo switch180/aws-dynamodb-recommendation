@@ -30,6 +30,12 @@ def recommendation(params):
     print('creating recommendation: ' + recommendation_status)
     return recommendation_status
 
+def autoscaling_recommendation(params):
+    autoscaling_status = athenaquery.create_dynamo_autoscaling_recommendation(params)
+    check_status(autoscaling_status, autoscaling_status)
+    print('creating autoscaling recommendation: ' + autoscaling_status)
+    return autoscaling_status
+
 def reservation(params):
     reserv_status = athenaquery.create_reserved_cost(params)
     check_status(reserv_status, reserv_status)
@@ -64,6 +70,7 @@ def lambda_handler(event,context):
         if params['action'] == 'create':
             cost_estimate(params)
             recommendation(params)
+            autoscaling_recommendation(params)
             reservation(params)
     except Exception as e:
         print(f"Error in create action: {e}")
