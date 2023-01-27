@@ -237,6 +237,3 @@ def get_metrics(params):
         create_athena_table(athena_tablename)
 
     return 'SUCCEEDED'
-
-
-

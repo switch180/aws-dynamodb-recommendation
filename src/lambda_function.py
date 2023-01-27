@@ -4,6 +4,7 @@ import athenaquery
 import os
 import estimates
 import getmetrics
+import dynamodb
 
 def check_status(status, error_message):
     if status not in ['Success', 'SUCCEEDED']:
@@ -29,6 +30,12 @@ def recommendation(params):
     check_status(recommendation_status, recommendation_status)
     print('creating recommendation: ' + recommendation_status)
     return recommendation_status
+
+def get_dynamodb_scaling_info(params):
+    get_scaling_info = dynamodb.get_dynamodb_scaling_info(params)
+    check_status(get_scaling_info, get_scaling_info)
+    print('getting DynamoDB scaling info: ' + get_scaling_info)
+    return get_scaling_info
 
 def autoscaling_recommendation(params):
     autoscaling_status = athenaquery.create_dynamo_autoscaling_recommendation(params)
@@ -59,6 +66,11 @@ def lambda_handler(event,context):
     params['athena_bucket'] = os.environ['ATHENA_BUCKET']
     params['athena_bucket_prefix'] = os.environ['ATHENA_PREFIX']
 
+    try:
+        get_dynamodb_scaling_info(params)
+    except Exception as e:
+        print(f"Error in getting_dynamnodb_scaling_info: {e}")
+        return { 'Message': str(e), 'StatusCode': 500 }
 
     try:
         get_metrics(params)

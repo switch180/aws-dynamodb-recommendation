@@ -465,77 +465,75 @@ def create_dynamo_autoscaling_recommendation(params):
     
     
 
-    intialqu = """CREATE OR REPLACE VIEW %s_autoscaling_sizing AS 
-            SELECT *
-        FROM
-        (
-        SELECT
-        name
-        , metric_name
-        , accountid
-        , (CASE WHEN (min(estUnit) <= 0) THEN 1 ELSE min(estUnit) END) est_min_unit
-        , min(unit) current_min_unit
-        FROM
-            (
-            SELECT
-                "p"."name"
-            , "p"."accountid"
-            , "p"."timestamp"
-            , "p"."metric_name"
-            , "%s"."unit"
-            , "p"."EstUnit"
-            FROM
-                ((
-                SELECT
-                "name"
-                , "accountid"
-                , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
-                , "avg"("estUnit") "EstUnit"
-                FROM
-                %sestimate
-                WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name", "accountid"
-            )  p
-            LEFT JOIN "%s" ON ((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name")))
-        ) 
-        WHERE (unit IS NOT NULL)
-        GROUP BY name, metric_name, accountid
-        UNION    SELECT
-            name
-        , metric_name
-        , accountid
-        , (CASE WHEN (min(estUnit) <= 0) THEN 1 ELSE min(estUnit) END) est_min_unit
-        , min(unit) current_min_unit
-        FROM
-            (
-            SELECT
-                "c"."name"
-            , "c"."accountid"
-            , "c"."timestamp"
-            , "c"."metric_name"
-            , "%s"."unit"
-            , "c"."EstUnit"
-            FROM
-                ((
-                SELECT
-                "name"
-                , "accountid"
-                , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
-                , "avg"("estUnit") "EstUnit"
-                FROM
-                %sestimate
-                WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name", "accountid"
-            )  c
-            LEFT JOIN "%s" ON ((("c"."timestamp" = "%s"."timestamp") AND ("c"."name" = "%s"."name")) AND ("c"."metric_name" = "%s"."metric_name")))
-        ) 
-        WHERE (unit IS NOT NULL)
-        GROUP BY name, metric_name, accountid
-        ) 
-        WHERE (current_min_unit > est_min_unit)"""
-    as_rec = intialqu % (tablename, tablename,tablename,tablename,tablename,tablename, tablename, tablename,tablename,tablename,tablename,tablename,tablename )
+    intialqu = """CREATE OR REPLACE VIEW "%s_autoscaling_sizing" AS 
+SELECT *
+FROM
+  (
+   SELECT
+     name
+   , metric_name
+   , accountid
+   , (CASE WHEN (min(estUnit) <= 0) THEN 1 ELSE min(estUnit) END) est_min_unit
+   , min(min_capacity) current_min_unit
+   FROM
+     (
+      SELECT
+        "p"."name"
+      , "p"."accountid"
+      , "p"."timestamp"
+      , "p"."metric_name"
+      , "%s_dynamodb_info"."min_capacity"
+      , "p"."EstUnit"
+      FROM
+        ((
+         SELECT
+           "name"
+         , "accountid"
+         , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
+         , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
+         , "avg"("estUnit") "EstUnit"
+         FROM
+           %sestimate
+         WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
+         GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name", "accountid"
+      )  p
+      LEFT JOIN "%s_dynamodb_info" ON (("p"."name" = "%s_dynamodb_info"."index_name") AND ("p"."metric_name" = "%s_dynamodb_info"."metric_name")))
+   ) 
+   GROUP BY name, metric_name, accountid
+UNION    SELECT
+     name
+   , metric_name
+   , accountid
+   , (CASE WHEN (min(estUnit) <= 0) THEN 1 ELSE min(estUnit) END) est_min_unit
+   , min(min_capacity) current_min_unit
+   FROM
+     (
+      SELECT
+        "c"."name"
+      , "c"."accountid"
+      , "c"."timestamp"
+      , "c"."metric_name"
+      , "%s_dynamodb_info"."min_capacity"
+      , "c"."EstUnit"
+      FROM
+        ((
+         SELECT
+           "name"
+         , "accountid"
+         , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
+         , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
+         , "avg"("estUnit") "EstUnit"
+         FROM
+           %sestimate
+         WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
+         GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name", "accountid"
+      )  c
+      LEFT JOIN "%s_dynamodb_info" ON (("c"."name" = "%s_dynamodb_info"."index_name") AND ("c"."metric_name" = "%s_dynamodb_info"."metric_name")))
+   ) 
+   GROUP BY name, metric_name, accountid
+) 
+WHERE (current_min_unit > est_min_unit)"""
+    as_rec = intialqu % (tablename, tablename,tablename,tablename,tablename,tablename, tablename, tablename,tablename,tablename,tablename )
     params = {
         'database': database,
         'bucket': bucket,

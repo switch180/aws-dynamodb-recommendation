@@ -41,6 +41,18 @@ Resources:
               - 'arn:${AWS::Partition}:s3:::${S3Bucket}/*'
               - bucketName: !Ref S3Bucket
             Effect: Allow
+      - PolicyName: DynamoDBAccess
+        PolicyDocument:
+          Statement:
+          - Action:
+            - 'dynamodb:ListTables'
+            - 'dynamodb:DescribeTable'
+            - 'application-autoscaling:DescribeScalableTargets'
+            - 'application-autoscaling:DescribeScalingActivities'
+            - 'application-autoscaling:DescribeScalingPolicies'
+            - 'application-autoscaling:DescribeScheduledActions'
+            Resource: '*'
+            Effect: Allow
       Tags:
       - Value: SAM
         Key: 'lambda:createdBy'
