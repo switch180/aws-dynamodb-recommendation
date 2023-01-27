@@ -494,46 +494,15 @@ FROM
          , "avg"("estUnit") "EstUnit"
          FROM
            %sestimate
-         WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
+            WHERE metric_name IN ('ConsumedReadCapacityUnits', 'ConsumedWriteCapacityUnits')
          GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name", "accountid"
       )  p
       LEFT JOIN "%s_dynamodb_info" ON (("p"."name" = "%s_dynamodb_info"."index_name") AND ("p"."metric_name" = "%s_dynamodb_info"."metric_name")))
    ) 
    GROUP BY name, metric_name, accountid
-UNION    SELECT
-     name
-   , metric_name
-   , accountid
-   , (CASE WHEN (min(estUnit) <= 0) THEN 1 ELSE min(estUnit) END) est_min_unit
-   , min(min_capacity) current_min_unit
-   FROM
-     (
-      SELECT
-        "c"."name"
-      , "c"."accountid"
-      , "c"."timestamp"
-      , "c"."metric_name"
-      , "%s_dynamodb_info"."min_capacity"
-      , "c"."EstUnit"
-      FROM
-        ((
-         SELECT
-           "name"
-         , "accountid"
-         , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-         , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
-         , "avg"("estUnit") "EstUnit"
-         FROM
-           %sestimate
-         WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-         GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name", "accountid"
-      )  c
-      LEFT JOIN "%s_dynamodb_info" ON (("c"."name" = "%s_dynamodb_info"."index_name") AND ("c"."metric_name" = "%s_dynamodb_info"."metric_name")))
-   ) 
-   GROUP BY name, metric_name, accountid
 ) 
 WHERE (current_min_unit > est_min_unit)"""
-    as_rec = intialqu % (tablename, tablename,tablename,tablename,tablename,tablename, tablename, tablename,tablename,tablename,tablename )
+    as_rec = intialqu % (tablename, tablename,tablename,tablename,tablename,tablename)
     params = {
         'database': database,
         'bucket': bucket,

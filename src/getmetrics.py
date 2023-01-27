@@ -12,6 +12,7 @@ import estimates
 
 
 cw = boto3.client('cloudwatch')
+
 #list metrics
 def lstmetrics (tablename):
     metrics_list = []
@@ -19,24 +20,15 @@ def lstmetrics (tablename):
     if tablename =='all':
         while True:
             if next_token:
-            
                 lsm =   cw.list_metrics(
-                    
-                    
                     Namespace='AWS/DynamoDB', NextToken=next_token
-                    
                     )
             else:
-                
-                lsm =   cw.list_metrics(
-                    
-                    
+                lsm =   cw.list_metrics(    
                     Namespace = 'AWS/DynamoDB'
-                    
                     )
             metrics = lsm['Metrics']
             metrics_list.extend(metrics)
-        
             # Exit loop if NextToken is None
             if 'NextToken' in lsm:
                 next_token = lsm['NextToken']
@@ -47,20 +39,17 @@ def lstmetrics (tablename):
         while True:
             if next_token:
                 lsm =   cw.list_metrics(
-                    
                     Dimensions = [{'Name': 'TableName','Value': tablename}],
                     Namespace = 'AWS/DynamoDB',NextToken=next_token
                     )
             else:       
                 lsm = cw.list_metrics(
-                
                 Dimensions = [{'Name': 'TableName','Value': tablename}],
                 Namespace = 'AWS/DynamoDB'
                 )
             metrics = lsm['Metrics']
             metrics_list.extend(metrics)
           
-
             # Exit loop if NextToken is None
             if 'NextToken' in lsm:
                 next_token = lsm['NextToken']
@@ -131,6 +120,7 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
                         }
                 ], StartTime= starttime, EndTime= endtime)
                 future.add_done_callback(lambda f,metric=metric: process_results(f.result(), metric['Dimensions'], accountid, metric_result_queue,estimate_result_queue,readutilization,writeutilization))
+                metr_list.append(future)
             # Retriving ConsumedCapacityUnits
             elif metric['MetricName'] == 'ConsumedReadCapacityUnits':
                 
@@ -161,6 +151,7 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
                         }
                 ], StartTime= starttime, EndTime= endtime))
                 future.add_done_callback(lambda f,metric=metric: process_results(f.result(), metric['Dimensions'], accountid, metric_result_queue,estimate_result_queue,readutilization,writeutilization))
+                metr_list.append(future)
         
     # Wait for all of the futures to complete
     concurrent.futures.wait(metr_list)
