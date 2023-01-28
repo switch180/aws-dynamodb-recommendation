@@ -26,7 +26,6 @@ def decrease15(L):
 
 
 def estimateUnits(read, write,readutilization,writeutilization):
-    
     #columns [metric_name,accountid,region,timestamp,name,units,unitps,estunit]
     finalreadcu = []
     count = 0
@@ -65,9 +64,9 @@ def estimateUnits(read, write,readutilization,writeutilization):
         last2maxwrite = max(last2write)
         last2minread = min(last2read)
         last2minwrite = min(last2write)
-        maxVread = maxA((last2minread / readutilization) * 100, prevread[6])
+        maxVread = maxA((last2minread / readutilization) * 100, prevread[7])
        
-        maxVwrite = maxA((last2minwrite/ writeutilization) * 100, prevwrite[6])
+        maxVwrite = maxA((last2minwrite/ writeutilization) * 100, prevwrite[7])
         # scale out based on last 2 min Units.
 
 
@@ -110,13 +109,13 @@ def estimateUnits(read, write,readutilization,writeutilization):
         last15Maxwrite = max(last15write)
         if count < 4:
             if not decrease15(last15read2):
-                currentread[7] = minA((last15Maxread / readutilization) * 100, currentread[6])
+                currentread[7] = minA((last15Maxread / readutilization) * 100, currentread[7])
                 if prevread[7] > currentread[7]:
 
                     count += 1                   
 
             if not decrease15(last15write2):
-                currentwrite[7] = minA((last15Maxwrite / writeutilization) * 100, currentwrite[6])
+                currentwrite[7] = minA((last15Maxwrite / writeutilization) * 100, currentwrite[7])
                 if prevwrite[7] > currentwrite[7]:
                     count += 1
                    
@@ -128,11 +127,11 @@ def estimateUnits(read, write,readutilization,writeutilization):
                 last60write = [v[7] for v in list(write[i - 60: i])]
                 # if Table has not scale in in past 60 minutes then scale in
                 if not decrease60(last60read) and not decrease60(last60write) :
-                    currentread[7] = minA((last15Maxread / readutilization) * 100, currentread[6])
+                    currentread[7] = minA((last15Maxread / readutilization) * 100, currentread[7])
                     
                        
                 if not decrease60(last60write) and  not decrease60(last60read):
-                    currentwrite[7] = minA((last15Maxwrite / writeutilization) * 100, currentwrite[6])
+                    currentwrite[7] = minA((last15Maxwrite / writeutilization) * 100, currentwrite[7])
                     
                     if prevread[7] > currentread[7] or prevwrite[7] > currentwrite[7] :
 
