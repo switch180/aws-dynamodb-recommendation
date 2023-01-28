@@ -14,49 +14,29 @@ import estimates
 
 
 #list metrics
-def lstmetrics (tablename,region):
-    cw = boto3.client('cloudwatch',region_name=region)
+def list_metrics(tablename: str, region: str) -> list:
+    # Create a client for the AWS CloudWatch service using the specified region
+    cw = boto3.client('cloudwatch', region_name=region)
+
+    # Create an empty list to store the metrics
     metrics_list = []
-    next_token = None
-    if tablename =='all':
-        while True:
-            if next_token:
-                lsm =   cw.list_metrics(
-                    Namespace='AWS/DynamoDB', NextToken=next_token
-                    )
-            else:
-                lsm =   cw.list_metrics(    
-                    Namespace = 'AWS/DynamoDB'
-                    )
-            metrics = lsm['Metrics']
-            metrics_list.extend(metrics)
-            # Exit loop if NextToken is None
-            if 'NextToken' in lsm:
-                next_token = lsm['NextToken']
-            else:
-                break
-        return metrics_list
+
+    # Create a paginator for the "list_metrics" operation
+    paginator = cw.get_paginator('list_metrics')
+
+    # Set the operation parameters based on the provided tablename
+    if tablename == 'all':
+        operation_parameters = {'Namespace': 'AWS/DynamoDB'}
     else:
-        while True:
-            if next_token:
-                lsm =   cw.list_metrics(
-                    Dimensions = [{'Name': 'TableName','Value': tablename}],
-                    Namespace = 'AWS/DynamoDB',NextToken=next_token
-                    )
-            else:       
-                lsm = cw.list_metrics(
-                Dimensions = [{'Name': 'TableName','Value': tablename}],
-                Namespace = 'AWS/DynamoDB'
-                )
-            metrics = lsm['Metrics']
-            metrics_list.extend(metrics)
-          
-            # Exit loop if NextToken is None
-            if 'NextToken' in lsm:
-                next_token = lsm['NextToken']
-            else:
-                break
-        return metrics_list
+        operation_parameters = {'Namespace': 'AWS/DynamoDB',
+                                'Dimensions': [{'Name': 'TableName','Value': tablename}]}
+
+    # Iterate through the paginated responses, appending each response's metrics to the list
+    for response in paginator.paginate(**operation_parameters):
+        metrics_list.extend(response['Metrics'])
+
+    # Return the list of metrics
+    return metrics_list
       
 
 
@@ -211,7 +191,7 @@ def get_metrics(params,regions):
     results_metrics = []
     results_estimates = []
     for region in regions:
-        metrics = lstmetrics(dynamodb_tablename,region)
+        metrics = list_metrics(dynamodb_tablename,region)
         result = get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid, readutilization, writeutilization,region)
         results_metrics.append(result[0])
         results_estimates.append(result[1])
@@ -239,3 +219,4 @@ def get_metrics(params,regions):
         create_athena_table(athena_tablename)
 
     return 'SUCCEEDED'
+
