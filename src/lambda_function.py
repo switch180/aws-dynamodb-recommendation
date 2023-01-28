@@ -7,13 +7,15 @@ import getmetrics
 import dynamodb
 
 def check_status(status, error_message):
-    if status not in ['Success', 'SUCCEEDED']:
+    if status == 'SUCCEEDED' or (isinstance(status, dict) and status.get('status') == 'SUCCEEDED'):
+        return True
+    else: 
         raise Exception(error_message)
-    return True
+    
 
-def get_metrics(params):
+def get_metrics(params,regions):
     print("fetching CW Metrics for " + params['dynamodb_tablename'] +  " Dynamo Tables\n")
-    status = getmetrics.get_metrics(params)
+    status = getmetrics.get_metrics(params,regions)
     check_status(status, status)
     print("CW Get Metrics Job: " + status)
     return status
@@ -34,7 +36,7 @@ def recommendation(params):
 def get_dynamodb_scaling_info(params):
     get_scaling_info = dynamodb.get_dynamodb_scaling_info(params)
     check_status(get_scaling_info, get_scaling_info)
-    print('getting DynamoDB scaling info: ' + get_scaling_info)
+    print('getting DynamoDB scaling info: ' + get_scaling_info['status'])
     return get_scaling_info
 
 def autoscaling_recommendation(params):
@@ -52,7 +54,7 @@ def reservation(params):
 
 def get_params(event):
     params = {}
-    keys = ['action', 'accountid', 'dynamodb_tablename', 'dynamodb_read_utilization', 'dynamodb_write_utilization', 'dynamodb_minimum_units', 'number_of_days_look_back', 'cloudwatch_metric_end_datatime']
+    keys = ['action', 'accountid', 'dynamodb_tablename', 'dynamodb_read_utilization', 'dynamodb_write_utilization', 'dynamodb_minimum_units', 'number_of_days_look_back', 'cloudwatch_metric_end_datatime','regions']
     for key in keys:
         if key in event:
             params[key] = event[key]
@@ -67,17 +69,17 @@ def lambda_handler(event,context):
     params['athena_bucket_prefix'] = os.environ['ATHENA_PREFIX']
 
     try:
-        get_dynamodb_scaling_info(params)
+        dynamodb_table_info = get_dynamodb_scaling_info(params)
     except Exception as e:
         print(f"Error in getting_dynamnodb_scaling_info: {e}")
         return { 'Message': str(e), 'StatusCode': 500 }
-
+    
     try:
-        get_metrics(params)
+        get_metrics(params,dynamodb_table_info['regions'])
     except Exception as e:
         print(f"Error in get_metrics: {e}")
         return { 'Message': str(e), 'StatusCode': 500 }
-        
+            
     try:
         if params['action'] == 'create':
             cost_estimate(params)
@@ -85,7 +87,7 @@ def lambda_handler(event,context):
             autoscaling_recommendation(params)
             reservation(params)
     except Exception as e:
-        print(f"Error in create action: {e}")
+        print(f"Error in creating Athena Views : {e}")
         return { 'Message': str(e), 'StatusCode': 500 }
     
     return { 'Message': 'Success', 'StatusCode': 200 }

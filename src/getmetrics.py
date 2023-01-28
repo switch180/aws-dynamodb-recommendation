@@ -11,10 +11,11 @@ import estimates
 
 
 
-cw = boto3.client('cloudwatch')
+
 
 #list metrics
-def lstmetrics (tablename):
+def lstmetrics (tablename,region):
+    cw = boto3.client('cloudwatch',region_name=region)
     metrics_list = []
     next_token = None
     if tablename =='all':
@@ -59,7 +60,8 @@ def lstmetrics (tablename):
       
 
 
-def process_results(metr_list,metric,accountid,metric_result_queue,estimate_result_queue,readutilization,writeutilization):
+def process_results(metr_list,metric,accountid,metric_result_queue,estimate_result_queue,readutilization,writeutilization,region):
+    
     metrics_result = []
     for result in metr_list['MetricDataResults']:
         
@@ -73,8 +75,9 @@ def process_results(metr_list,metric,accountid,metric_result_queue,estimate_resu
         tmdf['timestamp'] = pd.to_datetime(tmdf['timestamp'], unit='ms')
         tmdf['name'] =  name
         tmdf['accountid'] =  accountid
+        tmdf['region'] =  region
         tmdf['metric_name'] = result['Label']
-        tmdf = tmdf[['metric_name','accountid','timestamp','name','unit']]
+        tmdf = tmdf[['metric_name','accountid','region','timestamp','name','unit']]
         metrics_result.append(tmdf)
         metric_result_queue.put(tmdf)
     metrics_result = pd.concat(metrics_result)
@@ -84,7 +87,8 @@ def process_results(metr_list,metric,accountid,metric_result_queue,estimate_resu
     
         
 
-def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid,readutilization,writeutilization):
+def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid,readutilization,writeutilization,region):
+    cw = boto3.client('cloudwatch',region_name=region)
     metric_result_queue = Queue()
     estimate_result_queue = Queue()
     metr_list = []
@@ -119,7 +123,7 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
                         }
                         }
                 ], StartTime= starttime, EndTime= endtime)
-                future.add_done_callback(lambda f,metric=metric: process_results(f.result(), metric['Dimensions'], accountid, metric_result_queue,estimate_result_queue,readutilization,writeutilization))
+                future.add_done_callback(lambda f,metric=metric: process_results(f.result(), metric['Dimensions'], accountid, metric_result_queue,estimate_result_queue,readutilization,writeutilization,region))
                 metr_list.append(future)
             # Retriving ConsumedCapacityUnits
             elif metric['MetricName'] == 'ConsumedReadCapacityUnits':
@@ -150,7 +154,7 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
                         }
                         }
                 ], StartTime= starttime, EndTime= endtime))
-                future.add_done_callback(lambda f,metric=metric: process_results(f.result(), metric['Dimensions'], accountid, metric_result_queue,estimate_result_queue,readutilization,writeutilization))
+                future.add_done_callback(lambda f,metric=metric: process_results(f.result(), metric['Dimensions'], accountid, metric_result_queue,estimate_result_queue,readutilization,writeutilization,region))
                 metr_list.append(future)
         
     # Wait for all of the futures to complete
@@ -174,7 +178,8 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
 
 
 # Getting  Metrics
-def get_metrics(params):
+def get_metrics(params,regions):
+
     athena_tablename = params['athena_tablename']
     athena_database = params['athena_database']
     athena_bucket=params['athena_bucket']
@@ -186,7 +191,6 @@ def get_metrics(params):
     writeutilization = params['dynamodb_write_utilization']
     dynamodb_tablename = params['dynamodb_tablename']
     interval = params['number_of_days_look_back'] 
-    metrics = lstmetrics(dynamodb_tablename)
     now = params['cloudwatch_metric_end_datatime']
     now = datetime.strptime(now, '%Y-%m-%d %H:%M:%S')
     endtime = now 
@@ -204,27 +208,34 @@ def get_metrics(params):
 
     def create_athena_table(tablename):
         wr.catalog.table(database=athena_database, table=tablename)
+    results_metrics = []
+    results_estimates = []
+    for region in regions:
+        metrics = lstmetrics(dynamodb_tablename,region)
+        result = get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid, readutilization, writeutilization,region)
+        results_metrics.append(result[0])
+        results_estimates.append(result[1])
 
-    metrics = lstmetrics(dynamodb_tablename)
-    result = get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid, readutilization, writeutilization)
+    results_metrics_df = pd.concat(results_metrics,ignore_index=True)
+    results_estimates_df = pd.concat(results_estimates,ignore_index=True)
 
     if action_type == 'insert':
         print("appending to existing table")
         location_estimate = 's3://{}/{}/{}/estimate/'.format(athena_bucket, athena_bucket_prefix, athena_tablename)
-        write_to_s3(result[1], location_estimate, 'append', athena_tablename+'estimate')
+        write_to_s3(results_estimates_df, location_estimate, 'append', athena_tablename+'estimate')
         create_athena_table(athena_tablename+'estimate')
 
         location_metrics = 's3://{}/{}/{}/metrics/'.format(athena_bucket, athena_bucket_prefix, athena_tablename) 
-        write_to_s3(result[0], location_metrics, 'append', athena_tablename)
+        write_to_s3(results_metrics_df, location_metrics, 'append', athena_tablename)
         create_athena_table(athena_tablename)
     else:
         print("overwriting to existing table")
         location_estimate = 's3://{}/{}/{}/estimate/'.format(athena_bucket, athena_bucket_prefix, athena_tablename) 
-        write_to_s3(result[1], location_estimate, 'overwrite', athena_tablename+'estimate')
+        write_to_s3(results_estimates_df, location_estimate, 'overwrite', athena_tablename+'estimate')
         create_athena_table(athena_tablename+'estimate')
 
         location_metrics = 's3://{}/{}/{}/metrics/'.format(athena_bucket, athena_bucket_prefix, athena_tablename) 
-        write_to_s3(result[0], location_metrics, 'overwrite', athena_tablename)
+        write_to_s3(results_metrics_df, location_metrics, 'overwrite', athena_tablename)
         create_athena_table(athena_tablename)
 
     return 'SUCCEEDED'

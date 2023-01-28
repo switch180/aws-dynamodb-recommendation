@@ -26,6 +26,9 @@ def query_results(session, params):
         )
         status = response_get_query_details['QueryExecution']['Status']['State']
         time.sleep(1)
+        if status in ['FAILED' , 'CANCELLED']:
+            break
+        
     location = response_get_query_details['QueryExecution']['ResultConfiguration']['OutputLocation']
 
     

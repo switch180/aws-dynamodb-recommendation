@@ -105,6 +105,7 @@ def create_cost_estimate(params):
                 SELECT
                     "c"."name"
                 , "c"."accountid"
+                , "c"."region"
                 , "c"."timestamp"
                 , "c"."metric_name"
                 , "c"."cost" "ondemandcost"
@@ -118,6 +119,7 @@ def create_cost_estimate(params):
                     SELECT
                         "name"
                     , "accountid"
+                    , "region"
                     , "timestamp"
                     , "metric_name"
                     , "cost"
@@ -138,6 +140,7 @@ def create_cost_estimate(params):
                 SELECT
                     "p"."name"
                 , "p"."accountid"
+                , "p"."region"
                 , "p"."timestamp"
                 , "p"."metric_name"
                 , (CASE WHEN ("%s"."unit" IS NULL) THEN "p"."estunit" ELSE "%s"."unit" END) "EstUnit"
@@ -147,15 +150,16 @@ def create_cost_estimate(params):
                     SELECT
                         "name"
                     , "accountid"
+                    , "region"
                     , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
                     , (CASE WHEN ("avg"("estUnit") < %s) THEN %s ELSE "avg"("estUnit") END) "EstUnit"
                     , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
                     FROM
                         "%sestimate"
                     WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid"
+                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
                 )  p
-                LEFT JOIN default.%s ON ((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name")))
+                LEFT JOIN default.%s ON (((((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name"))) AND ("p"."region" = "%s"."region"))))
                 ) 
                 UNION SELECT
                 *
@@ -166,6 +170,7 @@ def create_cost_estimate(params):
                 SELECT
                     "name"
                 , "accountid"
+                , "region"
                 , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
                 , "metric_name"
                 , "sum"("Unit") "EstUnit"
@@ -173,7 +178,7 @@ def create_cost_estimate(params):
                 FROM
                     %s
                 WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid"
+                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
                 ) 
                         )
                     /*Dynamo Cost calc end */
@@ -183,6 +188,7 @@ def create_cost_estimate(params):
                     SELECT
                         "name"
                     , "accountid"
+                    , "region"
                     , "timestamp"
                     , "metric_name"
                     , "cost"
@@ -201,6 +207,7 @@ def create_cost_estimate(params):
                 SELECT
                     "p"."name"
                 , "p"."accountid"
+                , "p"."region"
                 , "p"."timestamp"
                 , "p"."metric_name"
                 , (CASE WHEN ("%s"."unit" IS NULL) THEN "p"."estunit" ELSE "%s"."unit" END) "EstUnit"
@@ -210,15 +217,16 @@ def create_cost_estimate(params):
                     SELECT
                         "name"
                     , "accountid"
+                    , "region"
                     , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
                     , (CASE WHEN ("avg"("estUnit") < %s) THEN %s ELSE "avg"("estUnit") END) "EstUnit"
                     , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
                     FROM
                         "%sestimate"
                     WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid"
+                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
                 )  p
-                LEFT JOIN "%s" ON ((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name")))
+                LEFT JOIN "%s" ON (((((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name"))) AND ("p"."region" = "%s"."region"))))
                 ) 
                 UNION SELECT
                 *
@@ -229,6 +237,7 @@ def create_cost_estimate(params):
                 SELECT
                     "name"
                 , "accountid"
+                , "region"
                 , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
                 , "metric_name"
                 , "sum"("Unit") "EstUnit"
@@ -236,7 +245,7 @@ def create_cost_estimate(params):
                 FROM
                     %s
                 WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid"
+                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid", "region"
                 ) 
                     )    
                     /*Dynamo Cost calc end */
@@ -247,6 +256,7 @@ def create_cost_estimate(params):
                 UNION    SELECT
                     "c"."name"
                 , "c"."accountid"
+                , "c"."region"
                 , "c"."timestamp"
                 , "c"."metric_name"
                 , "c"."cost"
@@ -260,6 +270,7 @@ def create_cost_estimate(params):
                     SELECT
                         "name"
                     , "accountid"
+                    , "region"
                     , "timestamp"
                     , "metric_name"
                     , "cost"
@@ -278,6 +289,7 @@ def create_cost_estimate(params):
                 SELECT
                     "p"."name"
                 , "p"."accountid"
+                , "p"."region"
                 , "p"."timestamp"
                 , "p"."metric_name"
                 , (CASE WHEN ("%s"."unit" IS NULL) THEN "p"."estunit" ELSE "%s"."unit" END) "EstUnit"
@@ -287,15 +299,16 @@ def create_cost_estimate(params):
                     SELECT
                         "name"
                     , "accountid"
+                    , "region"
                     , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
                     , (CASE WHEN ("avg"("estUnit") < %s) THEN %s ELSE "avg"("estUnit") END) "EstUnit"
                     , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
                     FROM
                         "%sestimate"
                     WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid"
+                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
                 )  p
-                LEFT JOIN "%s" ON ((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name")))
+                LEFT JOIN "%s" ON (((((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name"))) AND ("p"."region" = "%s"."region"))))
                 ) 
                 UNION SELECT
                 *
@@ -306,6 +319,7 @@ def create_cost_estimate(params):
                 SELECT
                     "name"
                 , "accountid"
+                , "region"
                 , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
                 , "metric_name"
                 , "sum"("Unit") "EstUnit"
@@ -313,7 +327,7 @@ def create_cost_estimate(params):
                 FROM
                     %s
                 WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid"
+                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
                 ) 
                     )
                     /*Dynamo Cost calc end */
@@ -323,6 +337,7 @@ def create_cost_estimate(params):
                     SELECT
                         "name"
                     , "accountid"
+                    , "region"
                     , "timestamp"
                     , "metric_name"
                     , "cost"
@@ -341,6 +356,7 @@ def create_cost_estimate(params):
                 SELECT
                     "p"."name"
                 , "p"."accountid"
+                , "p"."region"
                 , "p"."timestamp"
                 , "p"."metric_name"
                 , (CASE WHEN ("%s"."unit" IS NULL) THEN "p"."estunit" ELSE "%s"."unit" END) "EstUnit"
@@ -350,15 +366,16 @@ def create_cost_estimate(params):
                     SELECT
                         "name"
                     , "accountid"
+                    , "region"
                     , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
                     , (CASE WHEN ("avg"("estUnit") < %s) THEN %s ELSE "avg"("estUnit") END) "EstUnit"
                     , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
                     FROM
                         "%sestimate"
                     WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid"
+                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
                 )  p
-                LEFT JOIN "%s" ON ((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name")))
+                LEFT JOIN "%s" ON (((((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name"))) AND ("p"."region" = "%s"."region"))))
                 ) 
                 UNION SELECT
                 *
@@ -369,6 +386,7 @@ def create_cost_estimate(params):
                 SELECT
                     "name"
                 , "accountid"
+                , "region"
                 , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
                 , "metric_name"
                 , "sum"("Unit") "EstUnit"
@@ -376,19 +394,19 @@ def create_cost_estimate(params):
                 FROM
                     %s
                 WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name" , "accountid"
+                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name" , "accountid","region"
                 ) 
                     )
                     /*Dynamo Cost calc end */
                     WHERE ("metric_name" IN ('ProvisionedReadCapacityUnits'))
-                )  p ON (("c"."timestamp" = "p"."timestamp") AND ("c"."name" = "p"."name")))
+                )  p ON ((("c"."timestamp" = "p"."timestamp") AND ("c"."name" = "p"."name")) AND ("c"."region" = "p"."region"))) 
                 )"""
     costqu = intialqu % (
         tablename, tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename,
-        tablename, tablename, tablename, tablename, tablename, mins, mins,
+        tablename, tablename, tablename, tablename, tablename,tablename, mins, mins,
         tablename, tablename, tablename, tablename, tablename, tablename, tablename,
-        tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename,
-        tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename)
+        tablename, tablename,tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename,
+        tablename, tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename,tablename )
     params = {
         'database': database,
         'bucket': bucket,
@@ -415,6 +433,7 @@ def create_dynamo_mode_recommendation(params):
             "index_name"
             , "base_table_name"
             , "accountid"
+            , "region"
             , "provisioned_cost"
             , "Ondemand_cost"
             , "current_mode"
@@ -432,6 +451,7 @@ def create_dynamo_mode_recommendation(params):
                 (
                 SELECT
                     "name" "index_name"
+                , "region"
                 , "basetable" "base_table_name"
                 , "accountid"
                 , "sum"("provisionedcost") "provisioned_cost"
@@ -441,7 +461,7 @@ def create_dynamo_mode_recommendation(params):
                 , EXTRACT(DAY FROM (MAX(timestamp) - MIN(timestamp))) "number_of_days"
                 FROM
                 %s_cost_estimate
-            GROUP BY "name", "mode","basetable","accountid"
+            GROUP BY "name", "mode","basetable","accountid","region"
             ))"""
     costmodequ = intialqu % (tablename, tablename)
     params = {
@@ -471,6 +491,7 @@ FROM
   (
    SELECT
      name
+   , "region"
    , metric_name
    , accountid
    , (CASE WHEN (min(estUnit) <= 0) THEN 1 ELSE min(estUnit) END) est_min_unit
@@ -479,6 +500,7 @@ FROM
      (
       SELECT
         "p"."name"
+        , "p"."region"
       , "p"."accountid"
       , "p"."timestamp"
       , "p"."metric_name"
@@ -488,6 +510,7 @@ FROM
         ((
          SELECT
            "name"
+           , "region"
          , "accountid"
          , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
          , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
@@ -495,14 +518,14 @@ FROM
          FROM
            %sestimate
             WHERE metric_name IN ('ConsumedReadCapacityUnits', 'ConsumedWriteCapacityUnits')
-         GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name", "accountid"
+         GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name", "accountid","region"
       )  p
-      LEFT JOIN "%s_dynamodb_info" ON (("p"."name" = "%s_dynamodb_info"."index_name") AND ("p"."metric_name" = "%s_dynamodb_info"."metric_name")))
+      LEFT JOIN "%s_dynamodb_info" ON ((((("p"."name" = "%s_dynamodb_info"."index_name") AND ("p"."metric_name" = "%s_dynamodb_info"."metric_name"))) AND ("p"."region" = "%s_dynamodb_info"."region"))))
    ) 
-   GROUP BY name, metric_name, accountid
+   GROUP BY name, metric_name, accountid,region
 ) 
 WHERE (current_min_unit > est_min_unit)"""
-    as_rec = intialqu % (tablename, tablename,tablename,tablename,tablename,tablename)
+    as_rec = intialqu % (tablename, tablename,tablename,tablename,tablename,tablename,tablename)
     params = {
         'database': database,
         'bucket': bucket,

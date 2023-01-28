@@ -8,13 +8,16 @@ By using Athena and QuickSight, you can further analyze the data and gain insigh
 
 The function takes the following parameters in the event:
 
-- `action`: The action to perform. Accepted values are create or insert. create will recreate everything and insert will append the new metrics to existing metrics.
-- `accountid`: The AWS account ID of the DynamoDB table.
-- `dynamodb_tablename`: The name of the DynamoDB table to create cost estimates and recommendations for.
+- `action`: The action to perform on the DynamoDB table. Accepted values are `create` or `insert`. `create` will recreate the metrics and recommendations from scratch, while `insert` will append new metrics to existing metrics.
+
+    *Note:* If using '`insert`' action, make sure to change the `cloudwatch_metric_end_datetime` to avoid duplicates.
+- `accountid`: The AWS account ID of the DynamoDB table(s) to analyze.
+- `regions` : List of AWS Regions to analyze DynamoDB tables, example: `['us-east-1', 'us-east-2']`
+- `dynamodb_tablename`: The name of the DynamoDB table to create cost estimates and recommendations for. If set to `all`, the function will analyze all tables in the specified regions.
 - `dynamodb_read_utilization`: The read utilization percentage threshold to use when creating recommendations.
 - `dynamodb_write_utilization`: The write utilization percentage threshold to use when creating recommendations.
 - `dynamodb_minimum_units`: The minimum number of read and write capacity units to use when creating recommendations.
-- `number_of_days_look_back`: The number of days to look back in CloudWatch metrics when creating cost estimates and recommendations. Maximum number of days is 14 due to CloudWatch metrics limitations
+- `number_of_days_look_back`: The number of days to look back in CloudWatch metrics when creating cost estimates and recommendations. Maximum number of days is 14 due to CloudWatch metrics limitations.
 - `cloudwatch_metric_end_datatime`: The end time of the CloudWatch metrics to use when creating cost estimates and recommendations.
 
 It also takes the following environment variables:
@@ -73,7 +76,7 @@ To invoke this Lambda function, you can use the AWS Lambda service in the AWS Ma
 Using the AWS CLI:
 
   ```sh
-  aws lambda invoke --function-name my_lambda_function --payload '{"action":"create","accountid":"123456789","dynamodb_tablename":"all","dynamodb_read_utilization":70,"dynamodb_write_utilization":70,"dynamodb_minimum_units":5,"number_of_days_look_back":12,"cloudwatch_metric_end_datatime":"2023-01-26 00:00:00"}' response.json
+  aws lambda invoke --function-name my_lambda_function --payload '{"action":"create","regions": ["us-east-1"], "accountid":"123456789","dynamodb_tablename":"all","dynamodb_read_utilization":70,"dynamodb_write_utilization":70,"dynamodb_minimum_units":5,"number_of_days_look_back":12,"cloudwatch_metric_end_datatime":"2023-01-26 00:00:00"}' response.json
   ```
 
 Use Athena to query the <ATHENA_TABLENAME>_recommendation view and see the recommended throughput mode:
