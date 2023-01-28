@@ -44,7 +44,7 @@ def process_results(metr_list,metric,accountid,metric_result_queue,estimate_resu
     
     metrics_result = []
     for result in metr_list['MetricDataResults']:
-        
+
         try:
             name = str(metric[0]['Value']) + ":" + str(metric[1]['Value'])
         except: 
@@ -62,7 +62,7 @@ def process_results(metr_list,metric,accountid,metric_result_queue,estimate_resu
         metric_result_queue.put(tmdf)
     metrics_result = pd.concat(metrics_result)
     estimate_units = estimates.estimate(metrics_result,readutilization,writeutilization)
-    
+
     estimate_result_queue.put(estimate_units)
     
         
@@ -148,10 +148,12 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
     while not estimate_result_queue.empty():
         processed_estimate.append(estimate_result_queue.get())
     # convert the processed_metric list to dataframe
-        
-    metric_df = pd.concat(processed_metric,ignore_index=True)
-    estimate_df = pd.concat(processed_estimate,ignore_index=True)
-    return [metric_df,estimate_df]
+    if all(df.empty for df in processed_metric):
+        print("No Metrics were retrived in " + region +  " check end date provided for CloudWatch.")
+    else:
+        metric_df = pd.concat(processed_metric,ignore_index=True)
+        estimate_df = pd.concat(processed_estimate,ignore_index=True)
+        return [metric_df,estimate_df]
     
 
 
@@ -193,13 +195,14 @@ def get_metrics(params,regions):
     for region in regions:
         metrics = list_metrics(dynamodb_tablename,region)
         result = get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid, readutilization, writeutilization,region)
-        results_metrics.append(result[0])
-        results_estimates.append(result[1])
+        if result != None:
+            results_metrics.append(result[0])
+            results_estimates.append(result[1])
 
     results_metrics_df = pd.concat(results_metrics,ignore_index=True)
     results_estimates_df = pd.concat(results_estimates,ignore_index=True)
 
-    if action_type == 'insert':
+    if action_type == 'append':
         print("appending to existing table")
         location_estimate = 's3://{}/{}/{}/estimate/'.format(athena_bucket, athena_bucket_prefix, athena_tablename)
         write_to_s3(results_estimates_df, location_estimate, 'append', athena_tablename+'estimate')

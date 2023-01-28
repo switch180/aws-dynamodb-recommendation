@@ -47,11 +47,6 @@ def autoscaling_recommendation(params):
     print('creating autoscaling recommendation: ' + autoscaling_status)
     return autoscaling_status
 
-def reservation(params):
-    reserv_status = athenaquery.create_reserved_cost(params)
-    check_status(reserv_status, reserv_status)
-    print('creating reservation recommendation: ' + reserv_status)
-    return reserv_status
 
 
 def get_params(event):
@@ -119,7 +114,6 @@ def lambda_handler(event,context):
             cost_estimate(params)
             recommendation(params)
             autoscaling_recommendation(params)
-            reservation(params)
     except Exception as e:
         print(f"Error in creating Athena Views : {e}")
         return { 'Message': str(e), 'StatusCode': 500 }
