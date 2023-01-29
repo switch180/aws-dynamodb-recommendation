@@ -8,9 +8,9 @@ By using Athena and QuickSight, you can further analyze the data and gain insigh
 
 The function takes the following parameters in the event:
 
-- `action`: The action to perform on the DynamoDB table. Accepted values are `create` or `insert`. `create` will recreate the metrics and recommendations from scratch, while `insert` will append new metrics to existing metrics.
+- `action`: The action to perform on the DynamoDB table. Accepted values are `create` or `append`. `create` will recreate the metrics and recommendations from scratch, while `append` will append new metrics to existing metrics.
 
-    *Note:* If using '`insert`' action, make sure to change the `cloudwatch_metric_end_datetime` to avoid duplicates.
+    *Note:* If using '`append`' action, make sure to change the `cloudwatch_metric_end_datetime` to avoid duplicates.
 - `accountid`: The AWS account ID of the DynamoDB table(s) to analyze.
 - `regions` : List of AWS Regions to analyze DynamoDB tables, example: `['us-east-1', 'us-east-2']`
 - `dynamodb_tablename`: The name of the DynamoDB table to create cost estimates and recommendations for. If set to `all`, the function will analyze all tables in the specified regions.
@@ -45,6 +45,12 @@ The Lambda function performs the following steps:
 **Please note that the simulation of DynamoDB usage is based on the provided metrics and other assumptions, and it might be different from the actual usage.**
 # Deployment
 
+This deploys a stack that includes the following resources:
+
+S3 Bucket
+IAM Role
+Lambda Function
+## CloudFormation
 You can deploy this function as a zip file by CloudFormation template that creates the necessary resources such as the Lambda function, IAM role, and environment variables.
 
 To deploy your function using CloudFormation, you will need to package the source code in a zip file.
@@ -69,6 +75,25 @@ To deploy your function using CloudFormation, you will need to package the sourc
   aws cloudformation deploy --template-file deployment.yaml --stack-name dynamodb-estimation --parameter-overrides LambdaFunctionS3Bucket=<your-bucket-name> LambdaFunctionS3Key=<function.zip> --capabilities CAPABILITY_IAM
   ```
 
+## CDK
+
+**Prerequisites**
+
+- [AWS CDK](https://aws.amazon.com/cdk/) installed and configured on your local machine
+- [Python](https://www.python.org/downloads/) installed on your local machine
+- [AWS CLI](https://aws.amazon.com/cli/) installed and configured on your local machine
+- Familiarity with [AWS CDK](https://aws.amazon.com/cdk/) and [AWS Lambda](https://aws.amazon.com/lambda/)
+
+**Deployment**
+
+- Clone the repository
+- In the command line, navigate to cloned directory
+- Run `cdk synth` to create the CloudFormation template
+- Run `cdk deploy` to deploy the stack
+- Provide the required context values when prompted (`athena_bucket, athena_prefix, athena_database, athena_table_name`)
+
+**Cleanup**
+To delete the stack and all its associated resources, run `cdk destroy`.
 ## Usage
 
 To invoke this Lambda function, you can use the AWS Lambda service in the AWS Management Console, the AWS Command Line Interface (CLI), or one of the AWS SDKs. Here are examples of how you can invoke the function using the AWS CLI :

@@ -1,6 +1,7 @@
 import boto3
 import athena
 
+
 def create_cost_estimate(params):
     tablename = params['athena_tablename']
     database = params['athena_database']
@@ -317,10 +318,10 @@ def create_cost_estimate(params):
                 )"""
     costqu = intialqu % (
         tablename, tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename,
-        tablename, tablename, tablename, tablename, tablename,tablename, mins, mins,
+        tablename, tablename, tablename, tablename, tablename, tablename, mins, mins,
         tablename, tablename, tablename, tablename, tablename, tablename, tablename,
-        tablename, tablename,tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename,
-        tablename, tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename,tablename )
+        tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename,
+        tablename, tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename, tablename)
     params = {
         'database': database,
         'bucket': bucket,
@@ -329,7 +330,7 @@ def create_cost_estimate(params):
     }
 
     session = boto3.Session()
-    ## Fucntion for obtaining query results and location 
+    # Fucntion for obtaining query results and location
     status = athena.query_results(session, params)
     return status[0]
 
@@ -339,8 +340,6 @@ def create_dynamo_mode_recommendation(params):
     database = params['athena_database']
     bucket = params['athena_bucket']
     path = params['athena_bucket_prefix']
-    
-    
 
     intialqu = """CREATE OR REPLACE VIEW %s_recommendation AS 
             SELECT
@@ -386,7 +385,7 @@ def create_dynamo_mode_recommendation(params):
     }
 
     session = boto3.Session()
-    ## Fucntion for obtaining query results and location 
+    # Fucntion for obtaining query results and location
     status = athena.query_results(session, params)
     return (status[0])
 
@@ -396,8 +395,6 @@ def create_dynamo_autoscaling_recommendation(params):
     database = params['athena_database']
     bucket = params['athena_bucket']
     path = params['athena_bucket_prefix']
-    
-    
 
     intialqu = """CREATE OR REPLACE VIEW "%s_autoscaling_sizing" AS 
 SELECT *
@@ -439,7 +436,8 @@ FROM
    GROUP BY name, metric_name, accountid,region
 ) 
 WHERE (current_min_unit > est_min_unit)"""
-    as_rec = intialqu % (tablename, tablename,tablename,tablename,tablename,tablename,tablename)
+    as_rec = intialqu % (tablename, tablename, tablename,
+                         tablename, tablename, tablename, tablename)
     params = {
         'database': database,
         'bucket': bucket,
@@ -448,6 +446,6 @@ WHERE (current_min_unit > est_min_unit)"""
     }
 
     session = boto3.Session()
-    ## Fucntion for obtaining query results and location 
+    # Fucntion for obtaining query results and location
     status = athena.query_results(session, params)
     return (status[0])
