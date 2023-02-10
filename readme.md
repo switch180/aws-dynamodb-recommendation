@@ -47,9 +47,10 @@ The Lambda function performs the following steps:
 
 This deploys a stack that includes the following resources:
 
-S3 Bucket
-IAM Role
-Lambda Function
+- S3 Bucket
+- IAM Role
+- Lambda Function
+
 ## CloudFormation
 You can deploy this function as a zip file by CloudFormation template that creates the necessary resources such as the Lambda function, IAM role, and environment variables.
 
@@ -90,7 +91,7 @@ To deploy your function using CloudFormation, you will need to package the sourc
 - In the command line, navigate to cloned directory
 - Run `cdk synth` to create the CloudFormation template
 - Run `cdk deploy` to deploy the stack
-- Provide the required context values when prompted (`athena_bucket, athena_prefix, athena_database, athena_table_name`)
+- Provide the required context values (`athena_bucket, athena_prefix, athena_database, athena_table_name`)
 
 **Cleanup**
 To delete the stack and all its associated resources, run `cdk destroy`.
