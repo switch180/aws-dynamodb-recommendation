@@ -18,12 +18,22 @@ def get_dynamodb_autoscaling_settings(base_table_name, region, index_name=None):
     autoscaling_settings = response['ScalableTargets']
     data = []
     for setting in autoscaling_settings:
+        # Get the scaling policy for the setting
+        policy_response = app_autoscaling.describe_scaling_policies(
+            ServiceNamespace='dynamodb',
+            ResourceId=setting['ResourceId'],
+            ScalableDimension=setting['ScalableDimension']
+        )
+        policy = policy_response['ScalingPolicies'][0]["TargetTrackingScalingPolicyConfiguration"]
+
+
         data.append({
             'base_table_name': base_table_name,
             'index_name': index_name,
             'metric_name': setting['ScalableDimension'],
             'min_capacity': setting['MinCapacity'],
             'max_capacity': setting['MaxCapacity'],
+            'target_utilization': policy['TargetValue'],
             'region': region
         })
     df = pd.DataFrame(data)
