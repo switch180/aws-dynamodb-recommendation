@@ -7,321 +7,52 @@ def create_cost_estimate(params):
     database = params['athena_database']
     bucket = params['athena_bucket']
     path = params['athena_bucket_prefix']
-    mins = params['dynamodb_minimum_units']
+    write_min = params['dynamodb_minimum_write_unit']
+    read_min = params['dynamodb_minimum_read_unit']
 
-    intialqu = """CREATE OR REPLACE VIEW %s_cost_estimate AS 
-                SELECT
-                *
-                , split_part("name",':',1) as basetable
-                , (CASE WHEN ("mode" = 'Ondemand') THEN "ondemandcost" ELSE null END) "ondemandactualcost"
-                , (CASE WHEN ("mode" = 'Provisioned') THEN "provisionedcost" ELSE null END) "provisionedactualcost"
-                FROM
-                (
-                SELECT
-                    "c"."name"
-                , "c"."accountid"
-                , "c"."region"
-                , "c"."timestamp"
-                , "c"."metric_name"
-                , "c"."cost" "ondemandcost"
-                , "p"."estcost" "provisionedcost"
-                , "p"."metric_name" "Provisionedmetric_name"
-                , "p"."mode"
-                , "c"."unit" "ondemandunit"
-                , "p"."estunit" "provisionedunit"
-                FROM
-                    ((
-                    SELECT
-                        "name"
-                    , "accountid"
-                    , "region"
-                    , "timestamp"
-                    , "metric_name"
-                    , "cost"
-                    , "estcost"
-                    , (CASE WHEN ("cost" IS NULL) THEN null ELSE null END) "mode"
-                    , "unit"
-                    , "estunit"
-                    
-                    /*Dynamo Cost calc */
-                    FROM
-                        (   
-                        SELECT
-                *
-                , (CASE WHEN ("metric_name" = 'ProvisionedReadCapacityUnits') THEN ("estunit" * 1.3E-4) WHEN ("metric_name" = 'ProvisionedWriteCapacityUnits') THEN ("EstUnit" * 6.5E-4) ELSE 0 END) "estcost"
-                , (CASE WHEN ("metric_name" = 'ProvisionedReadCapacityUnits') THEN ("Unit" * 1.3E-4) WHEN ("metric_name" = 'ProvisionedWriteCapacityUnits') THEN ("Unit" * 6.5E-4) ELSE 0 END) "cost"
-                FROM
-                (
-                SELECT
-                    "p"."name"
-                , "p"."accountid"
-                , "p"."region"
-                , "p"."timestamp"
-                , "p"."metric_name"
-                , (CASE WHEN ("%s"."unit" IS NULL) THEN "p"."estunit" ELSE "%s"."unit" END) "EstUnit"
-                , "%s"."unit"
-                FROM
-                    ((
-                    SELECT
-                        "name"
-                    , "accountid"
-                    , "region"
-                    , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                    , (CASE WHEN ("avg"("estUnit") < %s) THEN %s ELSE "avg"("estUnit") END) "EstUnit"
-                    , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
-                    FROM
-                        "%sestimate"
-                    WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
-                )  p
-                LEFT JOIN default.%s ON (((((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name"))) AND ("p"."region" = "%s"."region"))))
-                ) 
-                UNION SELECT
-                *
-                , (CASE WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN (("unit" / 1000000) * 1.25) WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN (("unit" / 1000000) * 0.25) ELSE 0 END) "estcost"
-                , (CASE WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN (("unit" / 1000000) * 1.25) WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN (("unit" / 1000000) * 0.25) ELSE 0 END) "cost"
-                FROM
-                (
-                SELECT
-                    "name"
-                , "accountid"
-                , "region"
-                , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                , "metric_name"
-                , "sum"("Unit") "EstUnit"
-                , "sum"("unit") "Unit"
-                FROM
-                    %s
-                WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
-                ) 
-                        )
-                    /*Dynamo Cost calc end */
-                    WHERE ("metric_name" IN ('ConsumedWriteCapacityUnits'))
-                )  c
-                LEFT JOIN (
-                    SELECT
-                        "name"
-                    , "accountid"
-                    , "region"
-                    , "timestamp"
-                    , "metric_name"
-                    , "cost"
-                    , "estcost"
-                    , (CASE WHEN ("cost" IS NULL) THEN 'Ondemand' ELSE 'Provisioned' END) "mode"
-                    , "unit"
-                    , "estunit"
-                    /*Dynamo Cost calc */
-                    from (
-                    SELECT
-                *
-                , (CASE WHEN ("metric_name" = 'ProvisionedReadCapacityUnits') THEN ("estunit" * 1.3E-4) WHEN ("metric_name" = 'ProvisionedWriteCapacityUnits') THEN ("EstUnit" * 6.5E-4) ELSE 0 END) "estcost"
-                , (CASE WHEN ("metric_name" = 'ProvisionedReadCapacityUnits') THEN ("Unit" * 1.3E-4) WHEN ("metric_name" = 'ProvisionedWriteCapacityUnits') THEN ("Unit" * 6.5E-4) ELSE 0 END) "cost"
-                FROM
-                (
-                SELECT
-                    "p"."name"
-                , "p"."accountid"
-                , "p"."region"
-                , "p"."timestamp"
-                , "p"."metric_name"
-                , (CASE WHEN ("%s"."unit" IS NULL) THEN "p"."estunit" ELSE "%s"."unit" END) "EstUnit"
-                , "%s"."unit"
-                FROM
-                    ((
-                    SELECT
-                        "name"
-                    , "accountid"
-                    , "region"
-                    , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                    , (CASE WHEN ("avg"("estUnit") < %s) THEN %s ELSE "avg"("estUnit") END) "EstUnit"
-                    , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
-                    FROM
-                        "%sestimate"
-                    WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
-                )  p
-                LEFT JOIN "%s" ON (((((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name"))) AND ("p"."region" = "%s"."region"))))
-                ) 
-                UNION SELECT
-                *
-                , (CASE WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN (("unit" / 1000000) * 1.25) WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN (("unit" / 1000000) * 0.25) ELSE 0 END) "estcost"
-                , (CASE WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN (("unit" / 1000000) * 1.25) WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN (("unit" / 1000000) * 0.25) ELSE 0 END) "cost"
-                FROM
-                (
-                SELECT
-                    "name"
-                , "accountid"
-                , "region"
-                , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                , "metric_name"
-                , "sum"("Unit") "EstUnit"
-                , "sum"("unit") "Unit"
-                FROM
-                    %s
-                WHERE ("metric_name" = 'ConsumedWriteCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid", "region"
-                ) 
-                    )    
-                    /*Dynamo Cost calc end */
-                    
-                    WHERE ("metric_name" IN ('ProvisionedWriteCapacityUnits'))
-                )  p ON (("c"."timestamp" = "p"."timestamp") AND ("c"."name" = "p"."name")))
-                    
-                UNION    SELECT
-                    "c"."name"
-                , "c"."accountid"
-                , "c"."region"
-                , "c"."timestamp"
-                , "c"."metric_name"
-                , "c"."cost"
-                , "p"."estcost"
-                , "p"."metric_name" "estmetric_name"
-                , "p"."mode"
-                , "c"."unit"
-                , "p"."estunit"
-                FROM
-                    ((
-                    SELECT
-                        "name"
-                    , "accountid"
-                    , "region"
-                    , "timestamp"
-                    , "metric_name"
-                    , "cost"
-                    , "estcost"
-                    , (CASE WHEN ("cost" IS NULL) THEN null ELSE null END) "mode"
-                    , "unit"
-                    , "estunit"
-                    /*Dynamo Cost calc */
-                    from (
-                    SELECT
-                *
-                , (CASE WHEN ("metric_name" = 'ProvisionedReadCapacityUnits') THEN ("estunit" * 1.3E-4) WHEN ("metric_name" = 'ProvisionedWriteCapacityUnits') THEN ("EstUnit" * 6.5E-4) ELSE 0 END) "estcost"
-                , (CASE WHEN ("metric_name" = 'ProvisionedReadCapacityUnits') THEN ("Unit" * 1.3E-4) WHEN ("metric_name" = 'ProvisionedWriteCapacityUnits') THEN ("Unit" * 6.5E-4) ELSE 0 END) "cost"
-                FROM
-                (
-                SELECT
-                    "p"."name"
-                , "p"."accountid"
-                , "p"."region"
-                , "p"."timestamp"
-                , "p"."metric_name"
-                , (CASE WHEN ("%s"."unit" IS NULL) THEN "p"."estunit" ELSE "%s"."unit" END) "EstUnit"
-                , "%s"."unit"
-                FROM
-                    ((
-                    SELECT
-                        "name"
-                    , "accountid"
-                    , "region"
-                    , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                    , (CASE WHEN ("avg"("estUnit") < %s) THEN %s ELSE "avg"("estUnit") END) "EstUnit"
-                    , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
-                    FROM
-                        "%sestimate"
-                    WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
-                )  p
-                LEFT JOIN "%s" ON (((((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name"))) AND ("p"."region" = "%s"."region"))))
-                ) 
-                UNION SELECT
-                *
-                , (CASE WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN (("unit" / 1000000) * 1.25) WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN (("unit" / 1000000) * 0.25) ELSE 0 END) "estcost"
-                , (CASE WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN (("unit" / 1000000) * 1.25) WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN (("unit" / 1000000) * 0.25) ELSE 0 END) "cost"
-                FROM
-                (
-                SELECT
-                    "name"
-                , "accountid"
-                , "region"
-                , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                , "metric_name"
-                , "sum"("Unit") "EstUnit"
-                , "sum"("unit") "Unit"
-                FROM
-                    %s
-                WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
-                ) 
-                    )
-                    /*Dynamo Cost calc end */
-                    WHERE ("metric_name" IN ('ConsumedReadCapacityUnits'))
-                )  c
-                LEFT JOIN (
-                    SELECT
-                        "name"
-                    , "accountid"
-                    , "region"
-                    , "timestamp"
-                    , "metric_name"
-                    , "cost"
-                    , "estcost"
-                    , (CASE WHEN ("cost" IS NULL) THEN 'Ondemand' ELSE 'Provisioned' END) "mode"
-                    , "unit"
-                    , "estunit"
-                    /*Dynamo Cost calc */
-                    from (
-                    SELECT
-                *
-                , (CASE WHEN ("metric_name" = 'ProvisionedReadCapacityUnits') THEN ("estunit" * 1.3E-4) WHEN ("metric_name" = 'ProvisionedWriteCapacityUnits') THEN ("EstUnit" * 6.5E-4) ELSE 0 END) "estcost"
-                , (CASE WHEN ("metric_name" = 'ProvisionedReadCapacityUnits') THEN ("Unit" * 1.3E-4) WHEN ("metric_name" = 'ProvisionedWriteCapacityUnits') THEN ("Unit" * 6.5E-4) ELSE 0 END) "cost"
-                FROM
-                (
-                SELECT
-                    "p"."name"
-                , "p"."accountid"
-                , "p"."region"
-                , "p"."timestamp"
-                , "p"."metric_name"
-                , (CASE WHEN ("%s"."unit" IS NULL) THEN "p"."estunit" ELSE "%s"."unit" END) "EstUnit"
-                , "%s"."unit"
-                FROM
-                    ((
-                    SELECT
-                        "name"
-                    , "accountid"
-                    , "region"
-                    , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                    , (CASE WHEN ("avg"("estUnit") < %s) THEN %s ELSE "avg"("estUnit") END) "EstUnit"
-                    , (CASE WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' ELSE "metric_name" END) "metric_name"
-                    FROM
-                        "%sestimate"
-                    WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                    GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name","accountid","region"
-                )  p
-                LEFT JOIN "%s" ON (((((("p"."timestamp" = "%s"."timestamp") AND ("p"."name" = "%s"."name")) AND ("p"."metric_name" = "%s"."metric_name"))) AND ("p"."region" = "%s"."region"))))
-                ) 
-                UNION SELECT
-                *
-                , (CASE WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN (("unit" / 1000000) * 1.25) WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN (("unit" / 1000000) * 0.25) ELSE 0 END) "estcost"
-                , (CASE WHEN ("metric_name" = 'ConsumedWriteCapacityUnits') THEN (("unit" / 1000000) * 1.25) WHEN ("metric_name" = 'ConsumedReadCapacityUnits') THEN (("unit" / 1000000) * 0.25) ELSE 0 END) "cost"
-                FROM
-                (
-                SELECT
-                    "name"
-                , "accountid"
-                , "region"
-                , "date_trunc"('hour', CAST("timestamp" AS timestamp)) "timestamp"
-                , "metric_name"
-                , "sum"("Unit") "EstUnit"
-                , "sum"("unit") "Unit"
-                FROM
-                    %s
-                WHERE ("metric_name" = 'ConsumedReadCapacityUnits')
-                GROUP BY "date_trunc"('hour', CAST("timestamp" AS timestamp)), "name", "metric_name" , "accountid","region"
-                ) 
-                    )
-                    /*Dynamo Cost calc end */
-                    WHERE ("metric_name" IN ('ProvisionedReadCapacityUnits'))
-                )  p ON ((("c"."timestamp" = "p"."timestamp") AND ("c"."name" = "p"."name")) AND ("c"."region" = "p"."region"))) 
-                )"""
+    intialqu = """CREATE OR REPLACE VIEW "%s_cost_estimate" AS 
+        SELECT
+        q1.name
+        , q1.accountid
+        , q1.region
+        , q1.timestamp
+        , q1.metric_name
+        , q1.Provisioned_Estunit est_provisioned_unit
+        , q2.unit provisioned_unit
+        , q1.Consumed_unit "Consumed_unit"
+        , COALESCE(q2.provisioned_cost, q1.est_provisoned_cost) "provisioned_cost"
+        , q1.ondemand_cost "ondemand_cost"
+        FROM
+        ((
+        SELECT
+            name
+        , accountid
+        ,region
+        , date_trunc('hour', CAST(timestamp AS timestamp)) "timestamp"
+        , sum(unit) "Consumed_unit"
+        , avg((CASE WHEN (metric_name = 'ConsumedWriteCapacityUnits') THEN (CASE WHEN (estUnit < %s) THEN %s ELSE estUnit END) WHEN (metric_name = 'ConsumedReadCapacityUnits') THEN (CASE WHEN (estUnit < %s) THEN %s ELSE estUnit END) END)) Provisioned_Estunit
+        , (CASE WHEN (metric_name = 'ConsumedWriteCapacityUnits') THEN 'ProvisionedWriteCapacityUnits' WHEN (metric_name = 'ConsumedReadCapacityUnits') THEN 'ProvisionedReadCapacityUnits' ELSE null END) metric_name
+        , (CASE WHEN (metric_name = 'ConsumedWriteCapacityUnits') THEN ((sum(unit) / 1000000) * 1.25E0) WHEN (metric_name = 'ConsumedReadCapacityUnits') THEN ((sum(unit) / 1000000) * 2.5E-1) ELSE null END) ondemand_cost
+        , (CASE WHEN (metric_name = 'ConsumedWriteCapacityUnits') THEN (avg((CASE WHEN (estUnit < %s) THEN %s ELSE estUnit END)) * 1.3E-4) WHEN (metric_name = 'ConsumedReadCapacityUnits') THEN (avg((CASE WHEN (estUnit < %s) THEN %s ELSE estUnit END)) * 6.5E-4) ELSE null END) est_provisoned_cost
+        FROM
+            %sestimate
+        GROUP BY date_trunc('hour', CAST(timestamp AS timestamp)), name, metric_name, accountid,region
+        )  q1
+        LEFT JOIN (
+        SELECT
+            name
+        , accountid
+        ,region
+        , date_trunc('hour', CAST(timestamp AS timestamp)) "timestamp"
+        , metric_name
+        , sum(unit) "unit"
+        , (CASE WHEN (metric_name = 'ProvisionedReadCapacityUnits') THEN (avg(unit) * 1.3E-4) WHEN (metric_name = 'ProvisionedWriteCapacityUnits') THEN (avg(unit) * 6.5E-4) ELSE null END) provisioned_cost
+        FROM
+            %s
+        GROUP BY date_trunc('hour', CAST(timestamp AS timestamp)), name, metric_name, accountid,region
+        )  q2 ON ((q1.name = q2.name) AND (q1.accountid = q2.accountid) AND (q1.timestamp = q2.timestamp) AND (q1.metric_name = q2.metric_name)))"""
     costqu = intialqu % (
-        tablename, tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename,
-        tablename, tablename, tablename, tablename, tablename, tablename, mins, mins,
-        tablename, tablename, tablename, tablename, tablename, tablename, tablename,
-        tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename,
-        tablename, tablename, tablename, tablename, mins, mins, tablename, tablename, tablename, tablename, tablename, tablename, tablename)
+        tablename, write_min, write_min,read_min,read_min,write_min, write_min,read_min,read_min,tablename,tablename)
     params = {
         'database': database,
         'bucket': bucket,
@@ -342,41 +73,37 @@ def create_dynamo_mode_recommendation(params):
     path = params['athena_bucket_prefix']
 
     intialqu = """CREATE OR REPLACE VIEW %s_recommendation AS 
-            SELECT
-            "index_name"
-            , "base_table_name"
-            , "accountid"
-            , "region"
-            , "provisioned_cost"
-            , "Ondemand_cost"
-            , "current_mode"
-            , "recommended_mode"
-            , "diff" "difference_percentage"
-            , (CASE WHEN ("recommended_mode" = 'Provisioned') THEN "provisioned_cost" WHEN ("recommended_mode" = 'Ondemand') THEN "Ondemand_cost" ELSE 0 END) "estimated_cost"
-            , (CASE WHEN ("current_mode" = 'Provisioned') THEN "provisioned_cost" WHEN ("current_mode" = 'Ondemand') THEN "Ondemand_cost" ELSE 0 END) "current_cost"
-            , "number_of_days"
+        SELECT
+            q1.index_name,
+            q1.base_table_name,
+            q1.accountid,
+            q1.provisioned_cost,
+            q1.Ondemand_cost,
+            q1.recommended_mode,
+            q1.number_of_days,
+            case when %s_dynamodb_info.base_table_name is not NULL then 'Provisioned' else 'Ondemand' end current_mode
             FROM
-            (
-            SELECT
-                *
-            , (CASE WHEN (("recommended_mode" <> "current_mode") AND ("recommended_mode" = 'Provisioned')) THEN ((100 * ("provisioned_cost" - "Ondemand_cost")) / "Ondemand_cost") WHEN (("recommended_mode" <> "current_mode") AND ("recommended_mode" = 'Ondemand')) THEN ((100 * ("Ondemand_cost" - "provisioned_cost")) / "provisioned_cost") ELSE null END) "diff"
+            (SELECT
+                "name" "index_name",
+                split_part("name", ':', 1) "base_table_name",
+                "accountid",
+                "region",
+                "sum"("provisioned_cost") "provisioned_cost",
+                "sum"("ondemand_cost") "Ondemand_cost",
+                (CASE WHEN ("sum"("ondemand_cost") < "sum"("provisioned_cost")) THEN 'Ondemand'
+                    WHEN ("sum"("ondemand_cost") > "sum"("provisioned_cost")) THEN 'Provisioned'
+                    ELSE null
+                END) "recommended_mode",
+                EXTRACT(DAY FROM (MAX(timestamp) - MIN(timestamp))) "number_of_days"
             FROM
-                (
-                SELECT
-                    "name" "index_name"
-                , "region"
-                , "basetable" "base_table_name"
-                , "accountid"
-                , "sum"("provisionedcost") "provisioned_cost"
-                , "sum"("ondemandcost") "Ondemand_cost"
-                , "mode" "current_mode"
-                , (CASE WHEN ("sum"("ondemandcost") < "sum"("provisionedcost")) THEN 'Ondemand' WHEN ("sum"("ondemandcost") > "sum"("provisionedcost")) THEN 'Provisioned' ELSE null END) "recommended_mode"
-                , EXTRACT(DAY FROM (MAX(timestamp) - MIN(timestamp))) "number_of_days"
-                FROM
                 %s_cost_estimate
-            GROUP BY "name", "mode","basetable","accountid","region"
-            ))"""
-    costmodequ = intialqu % (tablename, tablename)
+            GROUP BY "name", split_part("name", ':', 1), "accountid","region"
+            ) q1
+            LEFT JOIN %s_dynamodb_info
+            ON %s_dynamodb_info.base_table_name = q1.base_table_name
+            AND %s_dynamodb_info.index_name = q1.index_name
+            AND %s_dynamodb_info.region = q1.region"""
+    costmodequ = intialqu % (tablename, tablename,tablename,tablename,tablename,tablename,tablename)
     params = {
         'database': database,
         'bucket': bucket,

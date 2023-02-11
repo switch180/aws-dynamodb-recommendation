@@ -25,7 +25,7 @@ def decrease15(L):
     return any(x > y for x, y in zip(L, L[1:]))
 
 
-def estimateUnits(read, write, readutilization, writeutilization):
+def estimateUnits(read, write,readutilization,writeutilization,read_min, write_min):
     #columns [metric_name,accountid,region,timestamp,name,units,unitps,estunit]
     finalreadcu = []
     count = 0
@@ -34,8 +34,8 @@ def estimateUnits(read, write, readutilization, writeutilization):
     prevwrite = write[0]
     finalwritecu += [prevwrite]
     finalreadcu += [prevread]
-    prevread[7] = (prevread[6] / readutilization) * 100
-    prevwrite[7] = (prevwrite[6] / writeutilization) * 100
+    prevread[7] = max((prevread[6] / readutilization) * 100,read_min)
+    prevwrite[7] = max((prevwrite[6] / writeutilization) * 100 , write_min)
     for i in range(1, len(read)):
         currentread = read[i]
         currentwrite = write[i]
@@ -106,15 +106,15 @@ def estimateUnits(read, write, readutilization, writeutilization):
         last15Maxwrite = max(last15write)
         if count < 4:
             if not decrease15(last15read2):
-                currentread[7] = minA(
-                    (last15Maxread / readutilization) * 100, currentread[7])
+                currentread[7] = max(minA(
+                    (last15Maxread / readutilization) * 100, currentread[7]),read_min)
                 if prevread[7] > currentread[7]:
 
                     count += 1
 
             if not decrease15(last15write2):
-                currentwrite[7] = minA(
-                    (last15Maxwrite / writeutilization) * 100, currentwrite[7])
+                currentwrite[7] = max(minA(
+                    (last15Maxwrite / writeutilization) * 100, currentwrite[7]),write_min)
                 if prevwrite[7] > currentwrite[7]:
                     count += 1
 
@@ -124,17 +124,20 @@ def estimateUnits(read, write, readutilization, writeutilization):
                 last60read = [v[7] for v in list(read[i - 60: i])]
                 last60write = [v[7] for v in list(write[i - 60: i])]
                 # if Table has not scale in in past 60 minutes then scale in
+                last_change = "read"
                 if not decrease60(last60read) and not decrease60(last60write):
-                    currentread[7] = minA(
-                        (last15Maxread / readutilization) * 100, currentread[7])
-
-                if not decrease60(last60write) and not decrease60(last60read):
-                    currentwrite[7] = minA(
-                        (last15Maxwrite / writeutilization) * 100, currentwrite[7])
-
-                    if prevread[7] > currentread[7] or prevwrite[7] > currentwrite[7]:
-
-                        count += 1
+                    if prevread[7] > max(minA((last15Maxread / readutilization) * 100, currentread[7]), read_min) and prevwrite[7] > max(minA((last15Maxwrite / writeutilization) * 100, currentwrite[7]), write_min):
+                        if last_change == "write":
+                            currentread[7] = max(minA((last15Maxread / readutilization) * 100, currentread[7]), read_min)
+                            last_change = "read"
+                        else:
+                            currentwrite[7] = max(minA((last15Maxwrite / writeutilization) * 100, currentwrite[7]), write_min)
+                            last_change = "write"
+                    else:
+                        currentwrite[7] = max(minA((last15Maxwrite / writeutilization) * 100, currentwrite[7]), write_min)
+                        currentread[7] = max(minA((last15Maxread / readutilization) * 100, currentread[7]), read_min)
+                else:
+                    pass
 
         prevread = currentread
         prevwrite = currentwrite
@@ -146,7 +149,7 @@ def estimateUnits(read, write, readutilization, writeutilization):
     return finalist
 
 
-def estimate(df, readutilization, writeutilization):
+def estimate(df, readutilization, writeutilization,read_min,write_min):
 
     df['unitps'] = df['unit'] / 60
     df['estunit'] = 5
@@ -166,7 +169,7 @@ def estimate(df, readutilization, writeutilization):
         if len(rcu) > 0 and len(wcu) > 0:
             print('estimating provisioned units for: ' + table_name)
             finalcu += estimateUnits(rcu, wcu,
-                                     readutilization, writeutilization)
+                                     readutilization, writeutilization,read_min,write_min)
     if len(finalcu) > 0:
         finaldf = pd.DataFrame(finalcu)
         finaldf.columns = ['metric_name', 'accountid', 'region', 'timestamp',

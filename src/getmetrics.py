@@ -36,7 +36,7 @@ def list_metrics(tablename: str, region: str) -> list:
     return metrics_list
 
 
-def process_results(metr_list, metric, accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region):
+def process_results(metr_list, metric, accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region,read_min,write_min):
 
     metrics_result = []
     for result in metr_list['MetricDataResults']:
@@ -59,12 +59,12 @@ def process_results(metr_list, metric, accountid, metric_result_queue, estimate_
         metric_result_queue.put(tmdf)
     metrics_result = pd.concat(metrics_result)
     estimate_units = estimates.estimate(
-        metrics_result, readutilization, writeutilization)
+        metrics_result, readutilization, writeutilization,read_min,write_min)
 
     estimate_result_queue.put(estimate_units)
 
 
-def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid, readutilization, writeutilization, region):
+def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid, readutilization, writeutilization, region,read_min,write_min):
     cw = boto3.client('cloudwatch', region_name=region)
     metric_result_queue = Queue()
     estimate_result_queue = Queue()
@@ -101,7 +101,7 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
                     }
                 ], StartTime=starttime, EndTime=endtime)
                 future.add_done_callback(lambda f, metric=metric: process_results(f.result(
-                ), metric['Dimensions'], accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region))
+                ), metric['Dimensions'], accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region,read_min,write_min))
                 metr_list.append(future)
             # Retriving ConsumedCapacityUnits
             elif metric['MetricName'] == 'ConsumedReadCapacityUnits':
@@ -133,7 +133,7 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
                     }
                 ], StartTime=starttime, EndTime=endtime))
                 future.add_done_callback(lambda f, metric=metric: process_results(f.result(
-                ), metric['Dimensions'], accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region))
+                ), metric['Dimensions'], accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region,read_min,write_min))
                 metr_list.append(future)
 
     # Wait for all of the futures to complete
@@ -166,6 +166,8 @@ def get_metrics(params, regions):
     action_type = params['action']
     provisioned_period = 3600
     consumed_period = 60
+    read_min = params['dynamodb_minimum_read_unit']
+    write_min = params['dynamodb_minimum_write_unit']
     readutilization = params['dynamodb_read_utilization']
     writeutilization = params['dynamodb_write_utilization']
     dynamodb_tablename = params['dynamodb_tablename']
@@ -193,7 +195,7 @@ def get_metrics(params, regions):
         print(f"Getting DynamoDB Metrics in : {region}")
         metrics = list_metrics(dynamodb_tablename, region)
         result = get_table_metrics(metrics, starttime, endtime, consumed_period,
-                                   provisioned_period, accountid, readutilization, writeutilization, region)
+                                   provisioned_period, accountid, readutilization, writeutilization, region,read_min,write_min)
         if result != None:
             results_metrics.append(result[0])
             results_estimates.append(result[1])

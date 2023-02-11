@@ -13,7 +13,6 @@ class AwsDynamodbRecommendationCdkStack(Stack):
     def __init__(self, scope: Construct, construct_id: str, **kwargs) -> None:
         super().__init__(scope, construct_id, **kwargs)
 
-        athena_bucket = self.node.try_get_context("athena_bucket")
         athena_prefix = self.node.try_get_context("athena_prefix")
         athena_database = self.node.try_get_context("athena_database")
         athena_table_name = self.node.try_get_context("athena_table_name")
@@ -93,7 +92,7 @@ class AwsDynamodbRecommendationCdkStack(Stack):
             handler="lambda_function.lambda_handler",
             code=_lambda.Code.from_asset("src"),
             environment={
-                "ATHENA_BUCKET": athena_bucket,
+                "ATHENA_BUCKET": s3_bucket.bucket_name,
                 "ATHENA_PREFIX": athena_prefix,
                 "ATHENA_DATABASE": athena_database,
                 "ATHENA_TABLENAME": athena_table_name

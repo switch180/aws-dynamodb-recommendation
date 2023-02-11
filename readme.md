@@ -91,7 +91,7 @@ To deploy your function using CloudFormation, you will need to package the sourc
 - In the command line, navigate to cloned directory
 - Run `cdk synth` to create the CloudFormation template
 - Run `cdk deploy` to deploy the stack
-- Provide the required context values (`athena_bucket, athena_prefix, athena_database, athena_table_name`)
+- Provide the required context values (`athena_prefix, athena_database, athena_table_name`)
 
 **Cleanup**
 To delete the stack and all its associated resources, run `cdk destroy`.

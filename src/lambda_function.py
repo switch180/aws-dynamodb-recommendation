@@ -57,8 +57,9 @@ def autoscaling_recommendation(params):
 
 def get_params(event):
     params = {}
-    keys = ['action', 'accountid', 'dynamodb_tablename', 'dynamodb_read_utilization', 'dynamodb_write_utilization',
-            'dynamodb_minimum_units', 'number_of_days_look_back', 'cloudwatch_metric_end_datatime', 'regions']
+    keys = ['action', 'accountid', 'dynamodb_tablename', 'dynamodb_read_utilization', 'dynamodb_write_utilization'
+            , 'number_of_days_look_back', 'cloudwatch_metric_end_datatime', 'regions','dynamodb_minimum_write_unit' ,
+        'dynamodb_minimum_read_unit' ]
     for key in keys:
         if key in event:
             value = event[key]
@@ -83,7 +84,11 @@ def get_params(event):
                 if not isinstance(value, int) or value < 0 or value > 100:
                     raise ValueError(
                         f"Invalid dynamodb_write_utilization '{key}'. dynamodb_write_utilization must be an integer between 0 and 100")
-            elif key == 'dynamodb_minimum_units':
+            elif key == 'dynamodb_minimum_write_unit':
+                if not isinstance(value, int) or value < 0:
+                    raise ValueError(
+                        f"Invalid dynamodb_minimum_units '{key}'. dynamodb_minimum_units must be a positive integer")
+            elif key == 'dynamodb_minimum_read_unit':
                 if not isinstance(value, int) or value < 0:
                     raise ValueError(
                         f"Invalid dynamodb_minimum_units '{key}'. dynamodb_minimum_units must be a positive integer")
