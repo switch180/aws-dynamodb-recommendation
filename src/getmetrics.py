@@ -2,18 +2,17 @@ import concurrent.futures
 import datetime
 from datetime import datetime, timedelta
 from queue import Queue
-
-import awswrangler as wr
 import boto3
-import estimates
+import src.metrics_estimates as estimates
 import pandas as pd
 from pytz import timezone
+from tqdm.contrib.concurrent import thread_map
 
 
 # list metrics
-def list_metrics(tablename: str, region: str) -> list:
+def list_metrics(tablename: str) -> list:
     # Create a client for the AWS CloudWatch service using the specified region
-    cw = boto3.client('cloudwatch', region_name=region)
+    cw = boto3.client('cloudwatch')
 
     # Create an empty list to store the metrics
     metrics_list = []
@@ -22,7 +21,7 @@ def list_metrics(tablename: str, region: str) -> list:
     paginator = cw.get_paginator('list_metrics')
 
     # Set the operation parameters based on the provided tablename
-    if tablename == 'all':
+    if not tablename:
         operation_parameters = {'Namespace': 'AWS/DynamoDB'}
     else:
         operation_parameters = {'Namespace': 'AWS/DynamoDB',
@@ -36,7 +35,7 @@ def list_metrics(tablename: str, region: str) -> list:
     return metrics_list
 
 
-def process_results(metr_list, metric, accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region,read_min,write_min):
+def process_results(metr_list, metric, metric_result_queue, estimate_result_queue, readutilization, writeutilization, read_min, write_min):
 
     metrics_result = []
     for result in metr_list['MetricDataResults']:
@@ -50,94 +49,95 @@ def process_results(metr_list, metric, accountid, metric_result_queue, estimate_
         tmdf['unit'] = tmdf['unit'].astype(float)
         tmdf['timestamp'] = pd.to_datetime(tmdf['timestamp'], unit='ms')
         tmdf['name'] = name
-        tmdf['accountid'] = accountid
-        tmdf['region'] = region
         tmdf['metric_name'] = result['Label']
-        tmdf = tmdf[['metric_name', 'accountid',
-                     'region', 'timestamp', 'name', 'unit']]
+        tmdf = tmdf[['metric_name',  'timestamp', 'name', 'unit']]
         metrics_result.append(tmdf)
         metric_result_queue.put(tmdf)
     metrics_result = pd.concat(metrics_result)
     estimate_units = estimates.estimate(
-        metrics_result, readutilization, writeutilization,read_min,write_min)
+        metrics_result, readutilization, writeutilization, read_min, write_min)
 
     estimate_result_queue.put(estimate_units)
 
 
-def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, accountid, readutilization, writeutilization, region,read_min,write_min):
-    cw = boto3.client('cloudwatch', region_name=region)
+def fetch_metric_data(metric, starttime, endtime, consumed_period, provisioned_period):
+    cw = boto3.client('cloudwatch')
+
+    if metric['MetricName'] == 'ProvisionedWriteCapacityUnits':
+        result = cw.get_metric_data(MetricDataQueries=[
+            {
+                'Id': 'provisioned_rcu',
+                'MetricStat': {
+                    'Metric': {
+                        'Namespace': 'AWS/DynamoDB',
+                        'MetricName': 'ProvisionedReadCapacityUnits',
+                        'Dimensions': metric['Dimensions']
+                    },
+                    'Period': provisioned_period,
+                    'Stat': 'Average'
+                },
+            },
+            {
+                'Id': 'provisioned_wcu',
+                'MetricStat': {
+                    'Metric': {
+                        'Namespace': 'AWS/DynamoDB',
+                        'MetricName': 'ProvisionedWriteCapacityUnits',
+                        'Dimensions': metric['Dimensions']
+                    },
+                    'Period': provisioned_period,
+                    'Stat': 'Average'
+                }
+            }
+        ], StartTime=starttime, EndTime=endtime)
+        return (result, metric['Dimensions'])
+
+    elif metric['MetricName'] == 'ConsumedReadCapacityUnits':
+        result = cw.get_metric_data(MetricDataQueries=[
+            {
+                'Id': 'consumed_rcu',
+                'MetricStat': {
+                    'Metric': {
+                        'Namespace': 'AWS/DynamoDB',
+                        'MetricName': 'ConsumedReadCapacityUnits',
+                        'Dimensions': metric['Dimensions']
+                    },
+                    'Period': consumed_period,
+                    'Stat': 'Sum'
+                },
+            },
+            {
+                'Id': 'consumed_wcu',
+                'MetricStat': {
+                    'Metric': {
+                        'Namespace': 'AWS/DynamoDB',
+                        'MetricName': 'ConsumedWriteCapacityUnits',
+                        'Dimensions': metric['Dimensions']
+                    },
+                    'Period': consumed_period,
+                    'Stat': 'Sum'
+                }
+            }
+        ], StartTime=starttime, EndTime=endtime)
+        return (result, metric['Dimensions'])
+
+    return None
+
+
+def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_period, readutilization, writeutilization, read_min, write_min):
     metric_result_queue = Queue()
     estimate_result_queue = Queue()
-    metr_list = []
-    # This will ensure that only 10 threads are running at a time to avoid overloading the system
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
-        for metric in metrics:
-            # Retriving provisionedCapacityUnits
-            if metric['MetricName'] == 'ProvisionedWriteCapacityUnits':
-                future = executor.submit(cw.get_metric_data, MetricDataQueries=[
-                    {
-                        'Id': 'provisioned_rcu',
-                        'MetricStat': {
-                            'Metric': {
-                                'Namespace': 'AWS/DynamoDB',
-                                'MetricName': 'ProvisionedReadCapacityUnits',
-                                'Dimensions': metric['Dimensions']
-                            },
-                            'Period': provisioned_period,
-                            'Stat': 'Average'
-                        },
-                    },
-                    {
-                        'Id': 'provisioned_wcu',
-                        'MetricStat': {
-                            'Metric': {
-                                'Namespace': 'AWS/DynamoDB',
-                                'MetricName': 'ProvisionedWriteCapacityUnits',
-                                'Dimensions': metric['Dimensions']
-                            },
-                            'Period': provisioned_period,
-                            'Stat': 'Average'
-                        }
-                    }
-                ], StartTime=starttime, EndTime=endtime)
-                future.add_done_callback(lambda f, metric=metric: process_results(f.result(
-                ), metric['Dimensions'], accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region,read_min,write_min))
-                metr_list.append(future)
-            # Retriving ConsumedCapacityUnits
-            elif metric['MetricName'] == 'ConsumedReadCapacityUnits':
+    # Using tqdm.contrib.concurrent.thread_map to fetch metric data with progress bar
+    metric_data_list = thread_map(lambda metric: fetch_metric_data(metric, starttime, endtime, consumed_period, provisioned_period), 
+                                  metrics, max_workers=10)
+    
+    # Filter out None values from the metric_data_list
+    metric_data_list = [result for result in metric_data_list if result is not None]
+    
+    print("starting process to estimate dynamodb table provisioned metrics")
+    thread_map(lambda result: process_results(result[0], result[1], metric_result_queue, estimate_result_queue, readutilization, writeutilization, read_min, write_min),
+               metric_data_list, max_workers=10)
 
-                future = (executor.submit(cw.get_metric_data, MetricDataQueries=[
-                    {
-                        'Id': 'consumed_rcu',
-                        'MetricStat': {
-                            'Metric': {
-                                'Namespace': 'AWS/DynamoDB',
-                                'MetricName': 'ConsumedReadCapacityUnits',
-                                'Dimensions': metric['Dimensions']
-                            },
-                            'Period': consumed_period,
-                            'Stat': 'Sum'
-                        },
-                    },
-                    {
-                        'Id': 'consumed_wcu',
-                        'MetricStat': {
-                            'Metric': {
-                                'Namespace': 'AWS/DynamoDB',
-                                'MetricName': 'ConsumedWriteCapacityUnits',
-                                'Dimensions': metric['Dimensions']
-                            },
-                            'Period': consumed_period,
-                            'Stat': 'Sum'
-                        }
-                    }
-                ], StartTime=starttime, EndTime=endtime))
-                future.add_done_callback(lambda f, metric=metric: process_results(f.result(
-                ), metric['Dimensions'], accountid, metric_result_queue, estimate_result_queue, readutilization, writeutilization, region,read_min,write_min))
-                metr_list.append(future)
-
-    # Wait for all of the futures to complete
-    concurrent.futures.wait(metr_list)
     # create an empty list to hold the dataframe
     processed_metric = []
     processed_estimate = []
@@ -148,8 +148,7 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
         processed_estimate.append(estimate_result_queue.get())
     # convert the processed_metric list to dataframe
     if all(df.empty for df in processed_metric):
-        print("No Metrics were retrived in " + region +
-              " check end date provided for CloudWatch.")
+        print("No Metrics were retrived in check end date provided for CloudWatch.")
     else:
         metric_df = pd.concat(processed_metric, ignore_index=True)
         estimate_df = pd.concat(processed_estimate, ignore_index=True)
@@ -157,13 +156,8 @@ def get_table_metrics(metrics, starttime, endtime, consumed_period, provisioned_
 
 
 # Getting  Metrics
-def get_metrics(params, regions):
+def get_metrics(params):
 
-    athena_tablename = params['athena_tablename']
-    athena_database = params['athena_database']
-    athena_bucket = params['athena_bucket']
-    athena_bucket_prefix = params['athena_bucket_prefix']
-    action_type = params['action']
     provisioned_period = 3600
     consumed_period = 60
     read_min = params['dynamodb_minimum_read_unit']
@@ -175,59 +169,12 @@ def get_metrics(params, regions):
     now = params['cloudwatch_metric_end_datatime']
     now = datetime.strptime(now, '%Y-%m-%d %H:%M:%S')
     endtime = now
-    accountid = params['accountid']
     starttime = endtime - timedelta(days=interval)
     endtime = endtime.strftime('%Y-%m-%dT%H:%M:%SZ')
     starttime = starttime.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    if athena_database not in wr.catalog.databases().values:
-        wr.catalog.create_database(athena_database)
+    metrics = list_metrics(dynamodb_tablename)
+    result = get_table_metrics(metrics, starttime, endtime, consumed_period,
+                               provisioned_period, readutilization, writeutilization, read_min, write_min)
 
-    def write_to_s3(df, location, mode, table):
-        wr.s3.to_parquet(df=df, path=location, database=athena_database,
-                         dataset=True, mode=mode, table=table)
-
-    def create_athena_table(tablename):
-        wr.catalog.table(database=athena_database, table=tablename)
-    results_metrics = []
-    results_estimates = []
-    for region in regions:
-        print(f"Getting DynamoDB Metrics in : {region}")
-        metrics = list_metrics(dynamodb_tablename, region)
-        result = get_table_metrics(metrics, starttime, endtime, consumed_period,
-                                   provisioned_period, accountid, readutilization, writeutilization, region,read_min,write_min)
-        if result != None:
-            results_metrics.append(result[0])
-            results_estimates.append(result[1])
-
-    results_metrics_df = pd.concat(results_metrics, ignore_index=True)
-    results_estimates_df = pd.concat(results_estimates, ignore_index=True)
-
-    if action_type == 'append':
-        print("appending to existing table")
-        location_estimate = 's3://{}/{}/{}/estimate/'.format(
-            athena_bucket, athena_bucket_prefix, athena_tablename)
-        write_to_s3(results_estimates_df, location_estimate,
-                    'append', athena_tablename+'estimate')
-        create_athena_table(athena_tablename+'estimate')
-
-        location_metrics = 's3://{}/{}/{}/metrics/'.format(
-            athena_bucket, athena_bucket_prefix, athena_tablename)
-        write_to_s3(results_metrics_df, location_metrics,
-                    'append', athena_tablename)
-        create_athena_table(athena_tablename)
-    else:
-        print("overwriting to existing table")
-        location_estimate = 's3://{}/{}/{}/estimate/'.format(
-            athena_bucket, athena_bucket_prefix, athena_tablename)
-        write_to_s3(results_estimates_df, location_estimate,
-                    'overwrite', athena_tablename+'estimate')
-        create_athena_table(athena_tablename+'estimate')
-
-        location_metrics = 's3://{}/{}/{}/metrics/'.format(
-            athena_bucket, athena_bucket_prefix, athena_tablename)
-        write_to_s3(results_metrics_df, location_metrics,
-                    'overwrite', athena_tablename)
-        create_athena_table(athena_tablename)
-
-    return 'SUCCEEDED'
+    return result

@@ -1,130 +1,113 @@
-# README
+# DynamoDB Throughput Optimization Tool
 
-This function helps to analyze the usage of DynamoDB tables and provides recommendations for the throughput mode that can be used to optimize cost. It uses CloudWatch metrics to simulate the usage of DynamoDB tables and provides cost estimates for different throughput modes. This function can be a valuable tool for managing DynamoDB tables and ensuring that they are running in an optimal configuration.
+This tool analyzes the usage patterns of DynamoDB tables and provides recommendations on how to optimize capacity provisioning. The recommendations are based on historical usage patterns, and can help reduce the cost of running DynamoDB.
 
-By using Athena and QuickSight, you can further analyze the data and gain insights into the usage patterns of your DynamoDB tables. This can help you to identify areas where you can optimize performance, reduce costs, and make better decisions about how to configure your DynamoDB tables.
+### Features
 
-## Parameters
+- Retrieves DynamoDB table information and autoscaling settings
+- Fetch CloudWatch metrics for DynamoDB tables and simulate Provisioned Capacity usage and autoscaling based on specified utilization targets and minimum read/write units
+- Provides cost optimization recommendations based on specified utilization targets and minimum read/write units
+- Generates summary CSV files and visualizations of current and recommended costs by the recommended mode
 
-The function takes the following parameters in the event:
+**Disclaimer:** This tool makes recommendations based on the number of days specified in the configuration file, which can be up to the last 14 days (configurable when running the tool). Additionally, when simulating the autoscaling behavior, it cannot consider network delays between scaling events until they are applied in reality. Therefore, it is recommended that recommendations be validated as some of them may not be applicable.
 
-- `action`: The action to perform on the DynamoDB table. Accepted values are `create` or `append`. `create` will recreate the metrics and recommendations from scratch, while `append` will append new metrics to existing metrics.
+Be aware that changing the throughput mode can have an impact on the applications, so be sure to test any changes thoroughly before making them in production.
 
-    *Note:* If using '`append`' action, make sure to change the `cloudwatch_metric_end_datetime` to avoid duplicates.
-- `accountid`: The AWS account ID of the DynamoDB table(s) to analyze.
-- `regions` : List of AWS Regions to analyze DynamoDB tables, example: `['us-east-1', 'us-east-2']`
-- `dynamodb_tablename`: The name of the DynamoDB table to create cost estimates and recommendations for. If set to `all`, the function will analyze all tables in the specified regions.
-- `dynamodb_read_utilization`: The read utilization percentage threshold to use when creating recommendations.
-- `dynamodb_write_utilization`: The write utilization percentage threshold to use when creating recommendations.
-- `dynamodb_minimum_units`: The minimum number of read and write capacity units to use when creating recommendations.
-- `number_of_days_look_back`: The number of days to look back in CloudWatch metrics when creating cost estimates and recommendations. Maximum number of days is 14 due to CloudWatch metrics limitations.
-- `cloudwatch_metric_end_datatime`: The end time of the CloudWatch metrics to use when creating cost estimates and recommendations.
+## Choosing Throughput Mode in DynamoDB
 
-It also takes the following environment variables:
+DynamoDB throughput modes determine how your tables will scale to handle varying levels of read and write traffic.It's important to understand the cost implications of each mode to make informed decisions about which mode to use.
 
-- `ATHENA_TABLENAME`: The name of the Athena table to create cost estimates and recommendations in.
-- `ATHENA_DATABASE`: The name of the Athena database to create cost estimates and recommendations in.
-- `ATHENA_BUCKET`: The name of the S3 bucket to use for Athena results.
-- `ATHENA_PREFIX`: The prefix of the S3 bucket to use for Athena results.
+There are two throughput modes available in DynamoDB:
 
-## Dependencies
+- **Provisioned Mode:** In this mode, you specify the read and write capacity for your table and DynamoDB reserves that capacity for your use. You pay a predictable hourly rate for the amount of capacity you provision.
 
-This function requires the following libraries to be installed:
+- **On-Demand Mode:** In this mode, DynamoDB automatically scales the read and write capacity for your table in response to traffic. You pay for only the requests that you make.
 
-- boto3
-- awswrangler
+### Provisioned Throughput
 
-## Functionality
+- Provisioned throughput is ideal for workloads that have consistent traffic patterns or predictable spikes in traffic.
+- Provisioned throughput provides better performance predictability and enables users to fine-tune capacity to their needs.
+- Provisioned throughput is also less expensive than on-demand throughput for predictable workloads.
 
-The Lambda function performs the following steps:
+ **Note:** Use auto-scaling to ensure that your tables can handle capacity changes automatically without manual intervention.
 
-1. Fetches CloudWatch metrics data for the DynamoDB table
-2. Estimates the cost of the DynamoDB table based on the target read and write utilization and minimum capacity units
-3. Recommends the best throughput mode for the DynamoDB table based on the usage
+### On-demand Throughput
 
-**Please note that the simulation of DynamoDB usage is based on the provided metrics and other assumptions, and it might be different from the actual usage.**
-# Deployment
+- On-demand throughput is ideal for workloads with unpredictable or infrequent traffic patterns.
+- On-demand throughput allows users to pay only for the capacity they consume without having to manually adjust capacity.
+- On-demand throughput can be more expensive than provisioned throughput for predictable workloads.
 
-This deploys a stack that includes the following resources:
+**Note:** It's important to monitor your DynamoDB usage and make adjustments to the throughput mode as necessary to optimize cost and performance.
 
-- S3 Bucket
-- IAM Role
-- Lambda Function
+## Requirements
 
-## CloudFormation
-You can deploy this function as a zip file by CloudFormation template that creates the necessary resources such as the Lambda function, IAM role, and environment variables.
+- Python 3.8
+- AWS CLI configured with appropriate credentials and region
+- Required Python packages listed in `requirements.txt
 
-To deploy your function using CloudFormation, you will need to package the source code in a zip file.
+## Installation
 
-1. Navigate to the root directory of your function's source code
-2. Run the following command to create a zip file of the `src` folder:
+1. Clone the repository
+2.  Create Python Virtual Environment for clean install
 
-  ```sh
-  cd src
-  zip -r function.zip .
-  ```
+    ```sh
+    python3.8 -m venv .venv
+    source .venv/bin/activate
+    ```
+3. Install the required Python packages:
 
-3. Upload the `function.zip` file to an S3 bucket. Make sure to update the CloudFormation template to reference this S3 object.
+    ```sh
+    pip3 install -r requirements.txt
+    ```
 
-  ```sh
-  aws s3 cp function.zip s3://<your-bucket-name>/function.zip
-  ```
-
-4. Deploy the CloudFormation template and pass the bucket name and function s3 key as parameters
-
-  ```sh
-  aws cloudformation deploy --template-file deployment.yaml --stack-name dynamodb-estimation --parameter-overrides LambdaFunctionS3Bucket=<your-bucket-name> LambdaFunctionS3Key=<function.zip> --capabilities CAPABILITY_IAM
-  ```
-
-## CDK
-
-**Prerequisites**
-
-- [AWS CDK](https://aws.amazon.com/cdk/) installed and configured on your local machine
-- [Python](https://www.python.org/downloads/) installed on your local machine
-- [AWS CLI](https://aws.amazon.com/cli/) installed and configured on your local machine
-- Familiarity with [AWS CDK](https://aws.amazon.com/cdk/) and [AWS Lambda](https://aws.amazon.com/lambda/)
-
-**Deployment**
-
-- Clone the repository
-- In the command line, navigate to cloned directory
-- Run `cdk synth` to create the CloudFormation template
-- Run `cdk deploy` to deploy the stack
-- Provide the required context values (`athena_prefix, athena_database, athena_table_name`)
-
-**Cleanup**
-To delete the stack and all its associated resources, run `cdk destroy`.
 ## Usage
 
-To invoke this Lambda function, you can use the AWS Lambda service in the AWS Management Console, the AWS Command Line Interface (CLI), or one of the AWS SDKs. Here are examples of how you can invoke the function using the AWS CLI :
+1. Set up the AWS CLI with appropriate credentials and region if you haven't done so already.
 
-Using the AWS CLI:
+2. Run the script with the desired options:
 
-  ```sh
-  aws lambda invoke --function-name my_lambda_function --payload '{"action":"create","regions": ["us-east-1"], "accountid":"123456789","dynamodb_tablename":"all","dynamodb_read_utilization":70,"dynamodb_write_utilization":70,"dynamodb_minimum_units":5,"number_of_days_look_back":12,"cloudwatch_metric_end_datatime":"2023-01-26 00:00:00"}' response.json
-  ```
 
-Use Athena to query the <ATHENA_TABLENAME>_recommendation view and see the recommended throughput mode:
+    ```sh
+    python3 recommendation.py --dynamodb-tablename TABLE_NAME --dynamodb-read-utilization READ_UTILIZATION --dynamodb-write-utilization WRITE_UTILIZATION --dynamodb-minimum-write-unit MINIMUM_WRITE_UNIT --dynamodb-minimum-read-unit MINIMUM_READ_UNIT --number-of-days-look-back DAYS_LOOK_BACK [--debug]
+    ```
 
-1.  Open the Amazon Athena console.
-2.  In the navigation pane, choose "Query Editor".
-3.  In the query editor, enter a query to select the recommended throughput mode from the ATHENA_TABLENAME, for example:
+    Replace the options with the desired values:
 
-  ```sh
-  SELECT * FROM <ATHENA_TABLENAME>_recommendation;
-  ```
+    - `TABLE_NAME`: DynamoDB table name (optional; if not provided, the script will process all tables in the specified region)
+    - `READ_UTILIZATION`: DynamoDB read utilization (default: `70`)
+    - `WRITE_UTILIZATION`: DynamoDB write utilization (default: `70`)
+    - `MINIMUM_WRITE_UNIT`: DynamoDB minimum write unit (default: `1`)
+    - `MINIMUM_READ_UNIT`: DynamoDB minimum read unit (default: `1`)
+    - `DAYS_LOOK_BACK`: Number of days to look back (default: `14`)
 
-4. Choose "Run Query"
-5. The query results will show the recommended throughput mode for the DynamoDB table.
+    Add the `--debug` flag to save metrics and estimates as CSV files in the `output` folder.
+3. The output files will be saved in the `output` folder.
 
-You can also connect the Athena Table to QuickSight and do further analysis.
-## Note
+## Output
 
-This code is intended to be used as a starting point and may require additional modifications and error handling to fit your specific use case.
+Check the generated files in the `output` folder for the summary CSV file and the visualization of the recommendations.
 
-It's important to keep in mind that this function is just a sample and you should always test and verify the function before use it in production.
+The **`summary.csv`** file contains the following columns:
 
-# License
-This software is provided "as is" and use it at your own risk.
-This code is licensed under the MIT License.
+- `index_name`: The name of the index associated with the recommendation.
+- `base_table_name`: The name of the base table associated with the recommendation.
+- `metric_name`: The name of the metric associated with the recommendation.
+- `est_provisioned_cost`: The estimated cost of the Provisioned Throughput mode based on the table's estimated usage.
+- `current_provisioned_cost`: The cost of the table's current Provisioned capacity.
+- `ondemand_cost`: The cost of using on-demand capacity mode for the table.
+- `recommended_mode`: The recommended capacity mode for the table.
+- `current_mode`: The table's current capacity mode.
+- `status`: The status of the recommendation if `Optimized` or `Not Optimized`.
+- `savings_pct`: The estimated percentage of cost savings by using the recommended capacity mode.
+- `number_of_days`: The number of days in the lookback period for the analysis.
+- `current_min_capacity`: The table's current minimum capacity.
+- `simulated_min_capacity`: The minimum capacity based on what the recommended capacity mode is simulated.
+- `current_target_utilization`: The table's current target utilization.
+- `simulated_target_utilization`: The target utilization based on what the recommended capacity mode is simulated.
+- `current_cost`: The table's current cost for period analyzed
+- `recommended_cost`: The table's estimated cost for period analyzed after applying the recommendation.
+- `autoscaling_enabled`: The Table's current Autoscaling Status.
+
+## License
+
+This project is licensed under the terms of the MIT License. See the [LICENSE](LICENSE) file for details.
