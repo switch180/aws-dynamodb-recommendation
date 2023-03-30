@@ -87,7 +87,7 @@ There are two throughput modes available in DynamoDB:
 
 Check the generated files in the `output` folder for the summary CSV file and the visualization of the recommendations.
 
-The **`summary.csv`** file contains the following columns:
+The **`recommendation_summary.csv`** file contains the following columns:
 
 - `index_name`: The name of the index associated with the recommendation.
 - `base_table_name`: The name of the base table associated with the recommendation.

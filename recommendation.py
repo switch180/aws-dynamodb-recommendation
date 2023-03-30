@@ -48,7 +48,7 @@ def process_dynamodb_table(dynamodb_table_info: pd.DataFrame, params: dict, debu
         metric_df.to_csv(filename_metrics, index=False)
         estimate_df.to_csv(filename_estimate, index=False)
         cost_estimate_df.to_csv(filename_cost_estimate, index=False)
-    filename_summary = os.path.join(dir_path, 'summary.csv')
+    filename_summary = os.path.join(dir_path, 'recommendation_summary.csv')
     summary_result[0].to_csv(filename_summary, index=False)
     return summary_result[0]
 
@@ -77,9 +77,8 @@ if __name__ == '__main__':
     print(params)
     dynamo_tables_result = DDBinfo.get_all_dynamodb_autoscaling_settings_with_indexes(
         params['dynamodb_tablename'])
+    
     dynamo_tables_result.to_csv(
         os.path.join(dir_path, 'dynamodb_table_info.csv'), index=False)
     process_dynamodb_result = process_dynamodb_table(
         dynamo_tables_result, params, args.debug)
-    print('Generating Visaul..')
-    visualize(process_dynamodb_result)
