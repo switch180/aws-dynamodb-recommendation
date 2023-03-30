@@ -7,7 +7,7 @@ This tool analyzes the usage patterns of DynamoDB tables and provides recommenda
 - Retrieves DynamoDB table information and autoscaling settings
 - Fetch CloudWatch metrics for DynamoDB tables and simulate Provisioned Capacity usage and autoscaling based on specified utilization targets and minimum read/write units
 - Provides cost optimization recommendations based on specified utilization targets and minimum read/write units
-- Generates summary CSV files and visualizations of current and recommended costs by the recommended mode
+- Generates recommendation summary file
 
 **Disclaimer:** This tool makes recommendations based on the number of days specified in the configuration file, which can be up to the last 14 days (configurable when running the tool). Additionally, when simulating the autoscaling behavior, it cannot consider network delays between scaling events until they are applied in reality. Therefore, it is recommended that recommendations be validated as some of them may not be applicable.
 
