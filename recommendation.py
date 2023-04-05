@@ -5,7 +5,6 @@ from src.getmetrics import get_metrics
 from src.cost_estimates import recommendation_summary
 import pandas as pd
 import pytz
-from src.visualize import visualize
 import os
 
 

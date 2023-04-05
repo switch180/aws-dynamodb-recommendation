@@ -1,11 +1,8 @@
 import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 import numpy as np
-import multiprocessing
-from itertools import zip_longest
 from tqdm import tqdm
 import boto3
-import botocore
 
 class DynamoDBAutoscaler:
     def __init__(self):
