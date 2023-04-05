@@ -78,7 +78,7 @@ There are two throughput modes available in DynamoDB:
     - `WRITE_UTILIZATION`: DynamoDB write utilization (default: `70`)
     - `MINIMUM_WRITE_UNIT`: DynamoDB minimum write unit (default: `1`)
     - `MINIMUM_READ_UNIT`: DynamoDB minimum read unit (default: `1`)
-    - `DAYS_LOOK_BACK`: Number of days to look back (default: `14`)
+    - `DAYS_LOOK_BACK`: Number (1-14) of days to look back (default: `14`)
 
     Add the `--debug` flag to save metrics and estimates as CSV files in the `output` folder.
 3. The output files will be saved in the `output` folder.

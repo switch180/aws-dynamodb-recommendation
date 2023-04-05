@@ -1,11 +1,9 @@
-import concurrent.futures
 import datetime
 from datetime import datetime, timedelta
 from queue import Queue
 import boto3
 import src.metrics_estimates as estimates
 import pandas as pd
-from pytz import timezone
 from tqdm.contrib.concurrent import thread_map
 
 
